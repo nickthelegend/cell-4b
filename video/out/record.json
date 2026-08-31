@@ -1,0 +1,86 @@
+{
+ "01_intro": {
+  "file": "raw/01_intro.webm",
+  "duration": 7.08,
+  "trim_start": 1.83,
+  "body": 5.0,
+  "say": "CELL 4B is a Raspberry Pi 4B enclosure for CELL, an open source hardware wallet that reads a drop of blood."
+ },
+ "09_explode": {
+  "file": "raw/09_explode.webm",
+  "duration": 12.84,
+  "trim_start": 1.839,
+  "body": 10.751,
+  "say": "Exploded, each component rides with the part it mounts to, so the build order reads straight off it."
+ },
+ "02_problem": {
+  "file": "raw/02_problem.webm",
+  "duration": 12.84,
+  "trim_start": 1.844,
+  "body": 10.746,
+  "say": "Upstream's shells are hard coded to a Pi Zero bay, and the Pi Zero 2 W is unobtainable in India. So this rebuilds the same instrument around a board you can actually buy."
+ },
+ "03_why_4b": {
+  "file": "raw/03_why_4b.webm",
+  "duration": 11.12,
+  "trim_start": 1.856,
+  "body": 9.014,
+  "say": "Everything upstream calls optics is preserved exactly. Everything it calls derived \u2014 walls, bosses, bays \u2014 is regenerated from Python."
+ },
+ "04_finding": {
+  "file": "raw/04_finding.webm",
+  "duration": 10.08,
+  "trim_start": 1.83,
+  "body": 8.0,
+  "say": "Building it surfaced a blocking defect upstream. A nine millimetre sensor standoff cannot coexist with five millimetre LEDs at forty five degrees. The longest LED body that fits is zero point seven three millimetres."
+ },
+ "05_cutaway": {
+  "file": "raw/05_cutaway.webm",
+  "duration": 15.8,
+  "trim_start": 1.874,
+  "body": 13.676,
+  "say": "The camera is invisible from outside because it sits inside the optical head, fourteen millimetres from the read spot. Hiding the head reveals it."
+ },
+ "06_ribbon": {
+  "file": "raw/06_ribbon.webm",
+  "duration": 13.88,
+  "trim_start": 2.902,
+  "body": 10.728,
+  "say": "Its ribbon had nowhere to go. Nothing in the design accounted for it. The route is now a hundred and ten millimetres, on edge through a twelve millimetre gap, and every millimetre is checked."
+ },
+ "07_clearance": {
+  "file": "raw/07_clearance.webm",
+  "duration": 10.2,
+  "trim_start": 1.894,
+  "body": 8.056,
+  "say": "Every component is measured surface to surface against every other. Sixty pairs, with designed contacts told apart from collisions by penetration depth."
+ },
+ "08_steps": {
+  "file": "raw/08_steps.webm",
+  "duration": 18.16,
+  "trim_start": 1.91,
+  "body": 16.0,
+  "say": "It assembles in ten steps. Emitters go into the head before it closes, the ribbon is routed before the deck caps it, and the cartridge slides in to stop two with its well on the read spot."
+ },
+ "10_plates": {
+  "file": "raw/10_plates.webm",
+  "duration": 12.36,
+  "trim_start": 1.838,
+  "body": 10.272,
+  "say": "Four plates, all inside a P1S bed. Shells, optics, and twenty cartridges printed from one white spool in one session, because that patch is a photometric reference."
+ },
+ "11_audit": {
+  "file": "raw/11_audit.webm",
+  "duration": 8.08,
+  "trim_start": 1.83,
+  "body": 6.0,
+  "say": "Three hundred and nine checks. The build refuses to write an STL if any of them fail."
+ },
+ "12_outro": {
+  "file": "raw/12_outro.webm",
+  "duration": 7.08,
+  "trim_start": 1.83,
+  "body": 5.0,
+  "say": "Parametric source, printable STLs and the findings are on GitHub, at nickthelegend slash cell dash 4B."
+ }
+}

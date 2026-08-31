@@ -1,0 +1,62 @@
+{
+ "01_intro": {
+  "wav": "vo/01_intro.wav",
+  "duration": 8.525,
+  "text": "CELL 4B is a Raspberry Pi 4B enclosure for CELL, an open source hardware wallet that reads a drop of blood."
+ },
+ "02_problem": {
+  "wav": "vo/02_problem.wav",
+  "duration": 12.45,
+  "text": "Upstream's shells are hard coded to a Pi Zero bay, and the Pi Zero 2 W is unobtainable in India. So this rebuilds the same instrument around a board you can actually buy."
+ },
+ "03_why_4b": {
+  "wav": "vo/03_why_4b.wav",
+  "duration": 10.475,
+  "text": "Everything upstream calls optics is preserved exactly. Everything it calls derived \u2014 walls, bosses, bays \u2014 is regenerated from Python."
+ },
+ "04_finding": {
+  "wav": "vo/04_finding.wav",
+  "duration": 15.575,
+  "text": "Building it surfaced a blocking defect upstream. A nine millimetre sensor standoff cannot coexist with five millimetre LEDs at forty five degrees. The longest LED body that fits is zero point seven three millimetres."
+ },
+ "05_cutaway": {
+  "wav": "vo/05_cutaway.wav",
+  "duration": 10.0,
+  "text": "The camera is invisible from outside because it sits inside the optical head, fourteen millimetres from the read spot. Hiding the head reveals it."
+ },
+ "06_ribbon": {
+  "wav": "vo/06_ribbon.wav",
+  "duration": 12.3,
+  "text": "Its ribbon had nowhere to go. Nothing in the design accounted for it. The route is now a hundred and ten millimetres, on edge through a twelve millimetre gap, and every millimetre is checked."
+ },
+ "07_clearance": {
+  "wav": "vo/07_clearance.wav",
+  "duration": 10.65,
+  "text": "Every component is measured surface to surface against every other. Sixty pairs, with designed contacts told apart from collisions by penetration depth."
+ },
+ "08_steps": {
+  "wav": "vo/08_steps.wav",
+  "duration": 12.05,
+  "text": "It assembles in ten steps. Emitters go into the head before it closes, the ribbon is routed before the deck caps it, and the cartridge slides in to stop two with its well on the read spot."
+ },
+ "09_explode": {
+  "wav": "vo/09_explode.wav",
+  "duration": 6.65,
+  "text": "Exploded, each component rides with the part it mounts to, so the build order reads straight off it."
+ },
+ "10_plates": {
+  "wav": "vo/10_plates.wav",
+  "duration": 11.75,
+  "text": "Four plates, all inside a P1S bed. Shells, optics, and twenty cartridges printed from one white spool in one session, because that patch is a photometric reference."
+ },
+ "11_audit": {
+  "wav": "vo/11_audit.wav",
+  "duration": 6.625,
+  "text": "Three hundred and nine checks. The build refuses to write an STL if any of them fail."
+ },
+ "12_outro": {
+  "wav": "vo/12_outro.wav",
+  "duration": 7.9,
+  "text": "Parametric source, printable STLs and the findings are on GitHub, at nickthelegend slash cell dash 4B."
+ }
+}

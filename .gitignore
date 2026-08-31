@@ -1,2 +1,5 @@
 __pycache__/
 out/glb/
+video/out/raw/
+video/out/cuts/
+video/out/vo/

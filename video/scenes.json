@@ -1,0 +1,18 @@
+{
+ "_help": "Speed multiplier per scene; 1 = real time. Edit these, then run video/rerender.py. Or let it pick: video/rerender.py --target 75. Audio uses atempo so pitch stays natural; nothing is cut.",
+ "scenes": {
+  "01_intro": 1,
+  "02_problem": 1,
+  "03_why_4b": 1,
+  "04_finding": 1,
+  "05_cutaway": 1,
+  "06_ribbon": 1,
+  "07_clearance": 1,
+  "08_steps": 1,
+  "09_explode": 1,
+  "10_plates": 1,
+  "11_audit": 1,
+  "12_outro": 1
+ },
+ "runtime_s": 125.03
+}
