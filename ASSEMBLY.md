@@ -26,13 +26,15 @@ in the file:
 | `CAM_HOLE_DX/DY` | 21.0 × 12.5 | your OV5647 clone's mounting holes |
 | `AS_HOLE_DX/DY` | 25.5 × 18.0 | Waveshare AS7341 hole pitch |
 | `LASER_BODY_D/L` | Ø6 × 10 | the brass barrel on your module |
+| `PI_SD_H` = 2.0 | how far the microSD hangs below the board — not on the official drawing |
+| `CAM_PCB_L/W` | 25 × 24 | sets the drop-in pocket the camera lowers into |
 
 ```bash
 python3 cad/build.py     # re-runs the audit, then rewrites STLs + plates
 ```
 
 The build **refuses to write** if any check fails, so a plate that reaches your
-slicer has already passed all 108.
+slicer has already passed all 304.
 
 ---
 
@@ -79,16 +81,17 @@ light than you expect.
 Fit everything into the head **before** it goes into the shell, and before
 `sensor_deck` caps it. Once the deck is on, the LED bores are unreachable.
 
-1. **Three LEDs**, from outside, into the three 45° side bores at z ≈ 31 mm:
-   - azimuth **0°** — white LED #1
-   - azimuth **180°** — white LED #2 (opposed, cancels droplet shading)
-   - azimuth **90°** — **940 nm IR**
+1. **Three LEDs**, from outside, into the three 45° side bores:
+   - azimuth **45°** — white LED #1
+   - azimuth **225°** — white LED #2 (opposed, cancels droplet shading)
+   - azimuth **135°** — **940 nm IR**
    Push each until the dome bottoms at slant 12. Leads trail out behind.
-2. **Laser** into the 30° bore at azimuth 270°. This is the one bore that
+2. **Laser** into the 30° bore at azimuth **270°**. This is the one bore that
    leaves through the **top** face, which is why the AS7341's narrow side has
    to face 90/270 — do not rotate the board.
-3. **Camera** on the 45° bore at azimuth 225°, lens **removed**, sensor facing
-   the spot at 20 mm.
+3. **Camera** on the 45° bore at azimuth **0°**, lens **removed**, sensor
+   facing the spot at 20 mm. It ends up **inside** the head, in a drop-in
+   pocket cut for it — lower it straight down before the deck goes on.
 4. **Route the CSI ribbon before the deck goes on.** This is the step that is
    easy to leave until too late. The camera sits at r = 14.1 mm from the read
    spot — **inside** the Ø52 head — so 96% of it is buried and its ribbon

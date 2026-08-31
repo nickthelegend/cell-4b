@@ -758,6 +758,30 @@ def check_cable_route(meshes, mocks_):
     return ok
 
 
+def check_docs():
+    """ASSEMBLY.md tells a human which bore to put which LED in. If it drifts
+    from spec.py the build goes wrong in a way no geometry check can see --
+    the parts fit perfectly and the instrument reads nonsense. This caught
+    ASSEMBLY.md still listing the pre-reallocation azimuths."""
+    import os
+    ok = True
+    path = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "ASSEMBLY.md")
+    if not os.path.exists(path):
+        return _rec(False, "docs/assembly-exists", "ASSEMBLY.md missing")
+    txt = open(path).read()
+    for label, az in (("white LED #1", S.AZ_LED1), ("white LED #2", S.AZ_LED2),
+                      ("940 nm IR", S.AZ_IR)):
+        want = f"azimuth **{az:.0f}\u00b0**"
+        ok &= _rec(want in txt, f"docs/{label.replace(' ', '-')}-azimuth",
+                   f"ASSEMBLY.md must say {want} for {label}")
+    for label, az in (("laser", S.AZ_LASER), ("Camera", S.AZ_CAMERA)):
+        ok &= _rec(f"azimuth **{az:.0f}\u00b0**" in txt,
+                   f"docs/{label.lower()}-azimuth",
+                   f"ASSEMBLY.md must say azimuth **{az:.0f}\u00b0** for the {label}")
+    return ok
+
+
 def check_plates(meshes):
     ok = True
     for nm, m in meshes.items():
@@ -843,6 +867,7 @@ def run(meshes=None, sampled=True):
         check_mock_fit(mk)
         check_seating(mk)
         check_cable_route(meshes, mk)
+        check_docs()
         check_interference(meshes, mk)
         check_plates(meshes)
         check_corridor(meshes)
