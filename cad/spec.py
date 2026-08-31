@@ -206,7 +206,12 @@ LED_BODY_D = 5.0
 # real LED: the longest body that clears an AS7341 board at a 9 mm standoff is
 # 0.73 mm, so even a 3 mm LED breaks it.
 LED_BODY_L = 8.6
-SWITCH_L, SWITCH_W, SWITCH_H = 20.0, 6.4, 10.0   # SPDT snap-action, VERIFY
+# Subminiature SPDT snap-action with a lever, e.g. Omron D2F-01L class.
+# The 20 x 6.4 full-size part does not fit the 7.2 mm front strip. VERIFY.
+SWITCH_L, SWITCH_W, SWITCH_H = 12.8, 6.0, 5.8
+SWITCH_LEVER = 5.0          # how far the lever reaches past the body
+SWITCH_FREE_TRAVEL = 1.2    # how far it protrudes into the channel when
+#                             undepressed -- this is what the cartridge presses
 RING_WINDOW_D, RING_WINDOW_T = 10.0, 0.5          # touch-tier window
 
 # --- fasteners --------------------------------------------------------------
@@ -258,7 +263,14 @@ SLOT_Z1 = SLOT_Z0 + SLOT_H              # slot ceiling
 Z_SAMPLE = SLOT_Z0 + CART_T             # PET window / well rim plane = 5.4
 HEAD_GAP = 0.80                         # head underside above the window
 HEAD_Z0 = Z_SAMPLE + HEAD_GAP           # 6.2
-HEAD_DIA = 52.0
+# Ø44, not Ø52. At Ø52 the space between the inner front wall and the head is
+# TRAVEL - R - WALL = 31.6 - 26 - 2.4 = 3.2 mm, and that strip is the ONLY
+# place the cartridge is exposed inside the case -- so there was nowhere to put
+# a cartridge-present switch, and the laser interlock had nothing to interlock.
+# R=22 keeps every bore's exit valid (LEDs and camera still leave through the
+# side at z=27.4, the laser still leaves through the top at r=16.2 with 2.1 mm
+# of wall) and opens the front gap to 7.2 mm.
+HEAD_DIA = 44.0
 HEAD_WALL = 2.4
 
 RS_X = 0.0                                        # read spot, X

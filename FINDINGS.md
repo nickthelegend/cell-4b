@@ -176,6 +176,55 @@ looks wrong. `audit.check_cartridge()` pins both identities.
 
 ---
 
+## 7. A Ø52 head leaves no room for the cartridge switch
+
+**Severity: functional. The laser interlock had nothing to interlock.**
+
+The cartridge is only exposed *inside* the case in one strip: between the inner
+front wall and the optical head.
+
+```
+TRAVEL - head radius - wall  =  31.6 - 26 - 2.4  =  3.2 mm
+```
+
+3.2 mm. Everywhere else along its travel the head is directly over it. So the
+cartridge-present microswitch — which upstream also makes the **hardware laser
+interlock**, wired in series with the laser's supply — had nowhere to sit where
+the cartridge could ever press it.
+
+This is worth stating plainly because it is a *functional* failure, not a fit
+failure: the switch sat in the case with 1.9 mm of clearance on every side and
+315 geometry checks were perfectly happy. It simply was never going to be
+touched. `audit.check_function()` now asserts the lever actually overlaps the
+channel, at cartridge height, over the cartridge's travel.
+
+**Fix:** the head shrinks to **Ø44**. Every bore exit stays valid — the LEDs and
+the speckle path still leave through the side wall at z = 27.4, and the laser
+still leaves through the top at r = 16.2 with 2.1 mm of wall — and the front
+strip opens to **7.2 mm**, which takes a subminiature switch body with its
+lever in the channel.
+
+Two knock-on fixes fell out of it: the head's mounting posts moved to r = 15 at
+30° off the X axis (at r = 19 they fouled the smaller skirt, and at the old
+azimuths they fouled the cartridge channel), and the slot baffle gained a notch
+for the switch body, which then fills the notch and keeps it light-tight.
+
+## 8. The ring is decorative in CELL-4B, and the touch tier is not implemented
+
+Not an upstream defect — a scope boundary, stated here so nobody expects
+otherwise from the render.
+
+Upstream's ring is the **touch-tier sensor port**: a fingertip on it is read by
+photoplethysmography through the same bore the cartridge sits under. In
+CELL-4B the ring is a Ø10 window over an empty Ø10 bore. **There are no
+touch-tier optics beneath it.** The AS7341 faces *down* at the sample plane
+28 mm below; nothing looks up at a finger.
+
+Implementing touch needs a second sensor station facing up, or the AS7341 moved
+between two mounts. Neither is in this build. What is here is the **blood
+tier** — which is what `BOUNTY.md`'s reader-only partial claim asks for, and
+the half that carries the novel physics.
+
 ## Not changed
 
 For the avoidance of doubt, these are untouched from `BUILD.md` §8/§9:

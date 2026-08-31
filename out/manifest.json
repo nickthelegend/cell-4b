@@ -67,12 +67,12 @@
   {
    "name": "optical_head",
    "qty": 1,
-   "triangles": 138736,
-   "volume_mm3": 45392.91,
+   "triangles": 114992,
+   "volume_mm3": 31112.21,
    "watertight": true,
    "bbox": [
-    52.0,
-    52.0,
+    44.0,
+    44.0,
     27.8
    ],
    "material": "black PLA",
@@ -83,12 +83,12 @@
   {
    "name": "sensor_deck",
    "qty": 1,
-   "triangles": 1796,
-   "volume_mm3": 4797.8,
+   "triangles": 1588,
+   "volume_mm3": 3364.25,
    "watertight": true,
    "bbox": [
-    52.0,
-    52.0,
+    44.0,
+    44.0,
     2.4
    ],
    "material": "black PLA",
@@ -99,11 +99,11 @@
   {
    "name": "slot_baffle",
    "qty": 1,
-   "triangles": 24,
-   "volume_mm3": 82.18,
+   "triangles": 12,
+   "volume_mm3": 41.09,
    "watertight": true,
    "bbox": [
-    36.0,
+    10.7,
     2.4,
     1.6
    ],
@@ -233,8 +233,8 @@
     "window_jig": 1
    },
    "extent": [
-    214.5,
-    84.0
+    238.0,
+    58.0
    ],
    "fits_p1s": true,
    "glb": "plate3.glb"
@@ -272,7 +272,7 @@
    3.0,
    6.0
   ],
-  "head_dia": 52.0,
+  "head_dia": 44.0,
   "bores": [
    {
     "name": "led1",
@@ -368,7 +368,7 @@
   }
  ],
  "audit": {
-  "checks": 309,
+  "checks": 315,
   "failed": 0
  },
  "gaps": [
@@ -472,6 +472,13 @@
   },
   {
    "a": "mock_cartridge",
+   "b": "mock_switch",
+   "kind": "contact",
+   "mm": 0.3,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_cartridge",
    "b": "slot_baffle",
    "kind": "slide",
    "mm": 0.3,
@@ -485,13 +492,6 @@
    "status": "PASS"
   },
   {
-   "a": "mock_cartridge",
-   "b": "optical_head",
-   "kind": "contact",
-   "mm": 0.45,
-   "status": "PASS"
-  },
-  {
    "a": "shell_lower",
    "b": "slot_baffle",
    "kind": "contact",
@@ -499,10 +499,10 @@
    "status": "PASS"
   },
   {
-   "a": "optical_head",
-   "b": "slot_baffle",
-   "kind": "clear",
-   "mm": 1.0,
+   "a": "mock_cartridge",
+   "b": "optical_head",
+   "kind": "contact",
+   "mm": 0.8,
    "status": "PASS"
   },
   {
@@ -534,6 +534,13 @@
    "status": "PASS"
   },
   {
+   "a": "optical_head",
+   "b": "slot_baffle",
+   "kind": "clear",
+   "mm": 1.65,
+   "status": "PASS"
+  },
+  {
    "a": "mock_as7341",
    "b": "optical_head",
    "kind": "clear",
@@ -544,7 +551,7 @@
    "a": "mock_switch",
    "b": "optical_head",
    "kind": "clear",
-   "mm": 1.86,
+   "mm": 2.04,
    "status": "PASS"
   },
   {
@@ -611,20 +618,6 @@
    "status": "PASS"
   },
   {
-   "a": "optical_head",
-   "b": "shell_upper",
-   "kind": "clear",
-   "mm": 3.21,
-   "status": "PASS"
-  },
-  {
-   "a": "sensor_deck",
-   "b": "shell_upper",
-   "kind": "clear",
-   "mm": 3.21,
-   "status": "PASS"
-  },
-  {
    "a": "mock_csi_ribbon",
    "b": "shell_lower",
    "kind": "clear",
@@ -660,13 +653,6 @@
    "status": "PASS"
   },
   {
-   "a": "mock_csi_ribbon",
-   "b": "optical_head",
-   "kind": "clear",
-   "mm": 4.59,
-   "status": "PASS"
-  },
-  {
    "a": "mock_as7341",
    "b": "mock_ring_window",
    "kind": "clear",
@@ -695,6 +681,13 @@
    "status": "PASS"
   },
   {
+   "a": "sensor_deck",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 5.8,
+   "status": "PASS"
+  },
+  {
    "a": "mock_laser",
    "b": "mock_leds",
    "kind": "clear",
@@ -702,10 +695,10 @@
    "status": "PASS"
   },
   {
-   "a": "sensor_deck",
+   "a": "mock_leds",
    "b": "shell_lower",
    "kind": "clear",
-   "mm": 6.34,
+   "mm": 6.37,
    "status": "PASS"
   },
   {
@@ -716,10 +709,17 @@
    "status": "PASS"
   },
   {
-   "a": "mock_leds",
-   "b": "shell_lower",
+   "a": "mock_csi_ribbon",
+   "b": "optical_head",
    "kind": "clear",
-   "mm": 8.27,
+   "mm": 7.6,
+   "status": "PASS"
+  },
+  {
+   "a": "optical_head",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 8.2,
    "status": "PASS"
   },
   {
@@ -748,6 +748,13 @@
    "b": "shell_upper",
    "kind": "clear",
    "mm": 12.97,
+   "status": "PASS"
+  },
+  {
+   "a": "sensor_deck",
+   "b": "shell_lower",
+   "kind": "clear",
+   "mm": 14.16,
    "status": "PASS"
   },
   {

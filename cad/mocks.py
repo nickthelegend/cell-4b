@@ -171,17 +171,30 @@ def cartridge_in_place():
 # head and the inner wall at 43.6, and every azimuth that clears the head runs
 # into one of the corner bosses. Turned 90 degrees it drops into the gap
 # between the head, the boss at (38, -58) and the front wall.
-# 34, not 32: at 32 it sat exactly MIN_CLEAR from the camera board, which
-# reaches r = 26.6 at azimuth 0 on its way out of the head.
-# Moved to -X entirely: the +X side now carries the CSI ribbon, which
-# passed within 0.33 mm of the switch at (34, -44).
-SWITCH_CX, SWITCH_CY = -30.0, -50.0
+# Cartridge-present switch. It has to be ACTUATED BY THE CARTRIDGE, which is
+# only exposed inside the case in the strip between the inner front wall and
+# the optical head. Everywhere else the head is over it.
+#
+# Its lever reaches into the cartridge channel; the body sits beside the slot
+# mouth. audit.check_switch_senses_cartridge() asserts the lever actually
+# overlaps the channel -- a switch that fits perfectly but cannot be pressed is
+# the failure this whole design is meant to avoid.
+import mocks_geom as MG
+
+SWITCH_CX, SWITCH_CY = MG.SWITCH_CX, MG.SWITCH_CY
 
 
 def switch():
-    g = box(SWITCH_CX - S.SWITCH_W / 2, SWITCH_CY - S.SWITCH_L / 2,
-            SWITCH_CX + S.SWITCH_W / 2, SWITCH_CY + S.SWITCH_L / 2)
-    return prism(g, S.FLOOR, S.FLOOR + S.SWITCH_H)
+    m = prism(MG.switch_footprint(), S.FLOOR, S.FLOOR + S.SWITCH_H)
+    # The lever is drawn DEPRESSED -- resting on the channel wall -- because
+    # the mock cartridge is inserted. Its FREE position protrudes
+    # SWITCH_FREE_TRAVEL further in; that is what actually gets pressed, and
+    # audit.check_function() asserts it.
+    hw = (S.CART_W + 2 * S.FIT) / 2
+    lev = box(hw, SWITCH_CY - 1.0, MG.SWITCH_CX - S.SWITCH_L / 2,
+              SWITCH_CY + 1.0)
+    m += prism(lev, S.SLOT_Z0 + 0.4, S.SLOT_Z0 + 1.8)
+    return m
 
 
 def csi_ribbon():

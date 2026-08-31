@@ -142,10 +142,12 @@ def aperture_tube():
 # --------------------------------------------------------------------------
 
 HEAD_SKIRT_Z = S.Z_SAMPLE + 0.20      # skirt reaches to 0.2 above the window
-# Post OD 6.4 at r=19 reaches r=22.2, inside the skirt's inner
-# radius of 23.0. At r=21 the post drove 0.4 mm into the skirt.
-HEAD_POST_R = 19.0
-HEAD_POST_AZ = [55.0, 125.0, 235.0, 305.0]
+# Posts must clear TWO things: the skirt (inner radius (HEAD_DIA-6)/2 = 19.0)
+# and the cartridge channel. OD 6.4 at r=15 reaches r=18.2, inside the skirt;
+# azimuths at 30 deg off the X axis put them at |x| = 13.0, clear of the
+# 7.3 mm channel plus a post radius.
+HEAD_POST_R = 15.0
+HEAD_POST_AZ = [30.0, 150.0, 210.0, 330.0]
 Z_TUBE_TOP = S.Z_SAMPLE + 9.0         # top of the Ø3 x 6 aperture tube
 
 
@@ -241,11 +243,17 @@ def slot_baffle():
     it. Together they are light-tight, and neither fouls the other -- a baffle
     tall enough to look sensible on its own drives straight into the skirt.
     """
+    import mocks_geom as MG
     w = S.SLOT_W + 2.0
     outer = box(-w / 2, -1.2, w / 2, 1.2)
     gap = box(-(S.CART_W + 2 * S.FIT) / 2, -2, (S.CART_W + 2 * S.FIT) / 2, 2)
-    return prism(outer.difference(gap), 0.0,
-                 HEAD_SKIRT_Z - S.SLOT_Z0 - 1.0)
+    # notch for the cartridge switch. The switch body fills the notch, so the
+    # baffle stays light-tight -- an open notch here would let the slot leak.
+    notch = MG.switch_footprint(0.9)      # > MIN_CLEAR, so it is a fit not a rub
+    prof = outer.difference(gap).difference(
+        pl.affinity.translate(notch, 0.0, -(-S.ENV_Y / 2 + S.WALL
+                                            + S.BAFFLE_OFFSET)))
+    return prism(prof, 0.0, HEAD_SKIRT_Z - S.SLOT_Z0 - 1.0)
 
 
 # --------------------------------------------------------------------------

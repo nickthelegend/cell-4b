@@ -546,6 +546,8 @@ CONTACT = {
     frozenset(("shell_lower", "shell_upper")),       # the lap joint
     frozenset(("shell_lower", "mock_pi4b")),         # board on its bosses
     frozenset(("shell_lower", "mock_switch")),
+    # the lever is PRESSED by the cartridge -- touching is the point
+    frozenset(("mock_cartridge", "mock_switch")),
     frozenset(("shell_lower", "slot_baffle")),
     frozenset(("shell_lower", "mock_cartridge")),    # rides the slot rails
     frozenset(("shell_upper", "mock_oled")),         # OLED on its posts
@@ -758,6 +760,52 @@ def check_cable_route(meshes, mocks_):
     return ok
 
 
+def check_function(mocks_):
+    """Does each feature actually DO its job?
+
+    Everything else in this file asks whether parts fit. Fitting is not
+    working. A cartridge switch can sit in the case with millimetres of
+    clearance on every side and still never be touched by the cartridge --
+    which is exactly what happened when it was moved out of the CSI ribbon's
+    way, and no geometry check noticed.
+    """
+    ok = True
+    hw = (S.CART_W + 2 * S.FIT) / 2
+
+    # 1. the cartridge switch must be actuated BY the cartridge
+    lo, hi = mocks_["mock_switch"].bbox()
+    # the mock shows the lever DEPRESSED at the channel wall; free travel is
+    # what the cartridge actually pushes against
+    free_x = float(lo[0]) - S.SWITCH_FREE_TRAVEL
+    reaches = free_x < hw and float(hi[0]) > -hw
+    in_y = float(lo[1]) < -S.ENV_Y / 2 + S.STOP2 and float(hi[1]) > -S.ENV_Y / 2
+    in_z = float(lo[2]) < S.SLOT_Z0 + S.CART_T and float(hi[2]) > S.SLOT_Z0
+    ok &= _rec(reaches and in_y and in_z, "function/switch-senses-cartridge",
+               f"lever rests at X={lo[0]:.2f}, springs in to {free_x:.2f}; "
+               f"cartridge edge is at {S.CART_W / 2:.2f}, so it gets pressed. "
+               f"Z {lo[2]:.1f}..{hi[2]:.1f} vs a cartridge at "
+               f"Z {S.SLOT_Z0}..{S.SLOT_Z0 + S.CART_T}")
+
+    # 2. that switch is also the laser interlock, so it must exist at all
+    ok &= _rec(reaches, "function/laser-interlock-has-a-switch",
+               "the laser's hardware interlock runs through this switch; if it "
+               "cannot be pressed there is nothing interlocking the laser")
+
+    # 3. the front strip is the only place the cartridge is reachable
+    strip = S.TRAVEL - S.HEAD_DIA / 2 - S.WALL
+    ok &= _rec(strip >= S.SWITCH_W + 0.8, "function/front-strip",
+               f"{strip:.1f} mm between the inner front wall and the head; a "
+               f"{S.SWITCH_W} mm switch body needs it. This is TRAVEL - R - WALL "
+               f"and shrinks as the head grows")
+
+    # 4. the ring: honest about what it is
+    ok &= _rec(True, "function/ring-is-decorative",
+               "the top ring is a Ø10 window over an empty bore. There are NO "
+               "touch-tier optics under it -- the AS7341 faces DOWN at the "
+               "sample. Blood tier only; see FINDINGS.md")
+    return ok
+
+
 def check_docs():
     """ASSEMBLY.md tells a human which bore to put which LED in. If it drifts
     from spec.py the build goes wrong in a way no geometry check can see --
@@ -868,6 +916,7 @@ def run(meshes=None, sampled=True):
         check_seating(mk)
         check_cable_route(meshes, mk)
         check_docs()
+        check_function(mk)
         check_interference(meshes, mk)
         check_plates(meshes)
         check_corridor(meshes)
