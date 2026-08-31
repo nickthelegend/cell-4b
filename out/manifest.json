@@ -1,0 +1,366 @@
+{
+ "parts": [
+  {
+   "name": "cartridge",
+   "qty": 20,
+   "triangles": 580,
+   "volume_mm3": 1851.75,
+   "watertight": true,
+   "bbox": [
+    14.0,
+    51.0,
+    3.6
+   ],
+   "material": "white PLA",
+   "settings": "0.15 mm, 3 perim, 100%, IRONING ON",
+   "orientation": "well-side up, no supports",
+   "colour": "#E9EDF2"
+  },
+  {
+   "name": "cartridge_reference",
+   "qty": 1,
+   "triangles": 308,
+   "volume_mm3": 1862.1,
+   "watertight": true,
+   "bbox": [
+    14.0,
+    51.0,
+    3.6
+   ],
+   "material": "white PLA",
+   "settings": "as cartridge",
+   "orientation": "well-side up",
+   "colour": "#E9EDF2"
+  },
+  {
+   "name": "cartridge_null",
+   "qty": 1,
+   "triangles": 36,
+   "volume_mm3": 1869.0,
+   "watertight": true,
+   "bbox": [
+    14.0,
+    51.0,
+    3.6
+   ],
+   "material": "white PLA",
+   "settings": "as cartridge",
+   "orientation": "flat, no supports",
+   "colour": "#E9EDF2"
+  },
+  {
+   "name": "aperture_tube",
+   "qty": 1,
+   "triangles": 800,
+   "volume_mm3": 185.76,
+   "watertight": true,
+   "bbox": [
+    10.0,
+    10.0,
+    7.0
+   ],
+   "material": "black PLA",
+   "settings": "0.12 mm, 4 perim, 100%",
+   "orientation": "FLANGE DOWN; paint the bore matte black",
+   "colour": "#2E3238"
+  },
+  {
+   "name": "optical_head",
+   "qty": 1,
+   "triangles": 178664,
+   "volume_mm3": 56516.15,
+   "watertight": true,
+   "bbox": [
+    52.0,
+    52.0,
+    27.8
+   ],
+   "material": "black PLA",
+   "settings": "0.12 mm, 6 perim, 40%",
+   "orientation": "base down, no supports; paint ALL bores matte black",
+   "colour": "#2E3238"
+  },
+  {
+   "name": "sensor_deck",
+   "qty": 1,
+   "triangles": 1828,
+   "volume_mm3": 4831.9,
+   "watertight": true,
+   "bbox": [
+    52.0,
+    52.0,
+    2.4
+   ],
+   "material": "black PLA",
+   "settings": "0.16 mm, 4 perim, 60%",
+   "orientation": "flat",
+   "colour": "#2E3238"
+  },
+  {
+   "name": "slot_baffle",
+   "qty": 1,
+   "triangles": 24,
+   "volume_mm3": 308.16,
+   "watertight": true,
+   "bbox": [
+    36.0,
+    2.4,
+    6.0
+   ],
+   "material": "black PLA",
+   "settings": "0.16 mm, 4 perim, 100%",
+   "orientation": "flat",
+   "colour": "#2E3238"
+  },
+  {
+   "name": "window_jig",
+   "qty": 1,
+   "triangles": 252,
+   "volume_mm3": 6096.47,
+   "watertight": true,
+   "bbox": [
+    60.0,
+    42.0,
+    3.0
+   ],
+   "material": "any",
+   "settings": "0.2 mm, 2 perim, 20%",
+   "orientation": "flat; not a device part",
+   "colour": "#8A9099"
+  },
+  {
+   "name": "shell_lower",
+   "qty": 1,
+   "triangles": 28556,
+   "volume_mm3": 55083.89,
+   "watertight": true,
+   "bbox": [
+    92.0,
+    128.0,
+    31.6
+   ],
+   "material": "black PLA",
+   "settings": "0.16 mm, 4 perim, 25%",
+   "orientation": "open side up, no supports",
+   "colour": "#3A3F46"
+  },
+  {
+   "name": "shell_upper",
+   "qty": 1,
+   "triangles": 9184,
+   "volume_mm3": 35266.82,
+   "watertight": true,
+   "bbox": [
+    92.0,
+    128.0,
+    16.0
+   ],
+   "material": "black PLA",
+   "settings": "0.16 mm, 4 perim, 25%",
+   "orientation": "TOP FACE DOWN, no supports",
+   "colour": "#3A3F46"
+  },
+  {
+   "name": "oled_bezel",
+   "qty": 1,
+   "triangles": 592,
+   "volume_mm3": 1901.8,
+   "watertight": true,
+   "bbox": [
+    38.5,
+    36.5,
+    2.0
+   ],
+   "material": "black PLA",
+   "settings": "0.12 mm, 4 perim, 100%",
+   "orientation": "flat, front face down",
+   "colour": "#2E3238"
+  },
+  {
+   "name": "sensor_carrier",
+   "qty": 1,
+   "triangles": 1120,
+   "volume_mm3": 2674.0,
+   "watertight": true,
+   "bbox": [
+    36.5,
+    29.0,
+    4.0
+   ],
+   "material": "black PLA",
+   "settings": "0.16 mm, 4 perim, 100%",
+   "orientation": "flat",
+   "colour": "#2E3238"
+  }
+ ],
+ "plates": [
+  {
+   "id": 1,
+   "title": "Plate 1 - shell lower",
+   "parts": {
+    "shell_lower": 1
+   },
+   "extent": [
+    92.0,
+    128.0
+   ],
+   "fits_p1s": true,
+   "glb": "plate1.glb"
+  },
+  {
+   "id": 2,
+   "title": "Plate 2 - shell upper",
+   "parts": {
+    "shell_upper": 1
+   },
+   "extent": [
+    92.0,
+    128.0
+   ],
+   "fits_p1s": true,
+   "glb": "plate2.glb"
+  },
+  {
+   "id": 3,
+   "title": "Plate 3 - optics + small parts",
+   "parts": {
+    "optical_head": 1,
+    "sensor_deck": 1,
+    "aperture_tube": 1,
+    "slot_baffle": 1,
+    "oled_bezel": 1,
+    "sensor_carrier": 1,
+    "window_jig": 1
+   },
+   "extent": [
+    214.5,
+    85.0
+   ],
+   "fits_p1s": true,
+   "glb": "plate3.glb"
+  },
+  {
+   "id": 4,
+   "title": "Plate 4 - cartridges",
+   "parts": {
+    "cartridge": 20,
+    "cartridge_reference": 1,
+    "cartridge_null": 1
+   },
+   "extent": [
+    248.0,
+    106.0
+   ],
+   "fits_p1s": true,
+   "glb": "plate4.glb"
+  }
+ ],
+ "spec": {
+  "envelope": [
+   92.0,
+   128.0,
+   42.0
+  ],
+  "read_spot": [
+   0.0,
+   -32.4,
+   5.4
+  ],
+  "sensor_standoff": 28.0,
+  "sensor_standoff_upstream": 9.0,
+  "aperture": [
+   3.0,
+   6.0
+  ],
+  "head_dia": 52.0,
+  "bores": [
+   {
+    "name": "led1",
+    "d": 5.4,
+    "tilt": 45.0,
+    "az": 0.0
+   },
+   {
+    "name": "led2",
+    "d": 5.4,
+    "tilt": 45.0,
+    "az": 180.0
+   },
+   {
+    "name": "ir",
+    "d": 5.4,
+    "tilt": 45.0,
+    "az": 90.0
+   },
+   {
+    "name": "laser",
+    "d": 6.4,
+    "tilt": 30.0,
+    "az": 270.0
+   },
+   {
+    "name": "camera",
+    "d": 6.0,
+    "tilt": 45.0,
+    "az": 225.0
+   }
+  ],
+  "pi_holes": [
+   [
+    39.0,
+    58.1
+   ],
+   [
+    39.0,
+    9.1
+   ],
+   [
+    -19.0,
+    58.1
+   ],
+   [
+    -19.0,
+    9.1
+   ]
+  ],
+  "plate_max": 250.0
+ },
+ "mocks": [
+  {
+   "name": "mock_pi4b",
+   "colour": "#1E6B4E"
+  },
+  {
+   "name": "mock_as7341",
+   "colour": "#2B6CB0"
+  },
+  {
+   "name": "mock_camera",
+   "colour": "#3B4A5A"
+  },
+  {
+   "name": "mock_laser",
+   "colour": "#B04A4A"
+  },
+  {
+   "name": "mock_leds",
+   "colour": "#E8E4D0"
+  },
+  {
+   "name": "mock_oled",
+   "colour": "#1A2A3A"
+  },
+  {
+   "name": "mock_ring_window",
+   "colour": "#9FD8E8"
+  },
+  {
+   "name": "mock_switch",
+   "colour": "#6B6B6B"
+  },
+  {
+   "name": "mock_cartridge",
+   "colour": "#EDF1F5"
+  }
+ ]
+}

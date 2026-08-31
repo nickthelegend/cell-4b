@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CELL-4B model viewer</title>
+<style>
+  :root{
+    --bg:#0e1013; --panel:#15181d; --line:#242a32; --ink:#e6eaef;
+    --dim:#8b95a3; --accent:#ff9d3c; --ok:#4ade80; --warn:#f87171;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font:13px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  #app{display:flex;height:100%}
+  #side{width:290px;flex:none;background:var(--panel);border-right:1px solid var(--line);
+    overflow-y:auto;padding:16px}
+  #stage{flex:1;position:relative;min-width:0}
+  canvas{display:block}
+  h1{font-size:19px;margin:0 0 2px;letter-spacing:-.02em}
+  h1 span{color:var(--accent)}
+  .sub{color:var(--dim);font-size:11.5px;margin-bottom:14px}
+  .lbl{font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--dim);margin:16px 0 6px}
+  select{width:100%;background:#0c0e11;color:var(--ink);border:1px solid var(--line);
+    border-radius:7px;padding:8px 9px;font:inherit;outline:none}
+  select:focus{border-color:var(--accent)}
+  .row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px}
+  .row input{accent-color:var(--accent);margin:0}
+  .sw{width:10px;height:10px;border-radius:2px;flex:none;border:1px solid #0006}
+  .row label{flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .q{color:var(--dim);font-variant-numeric:tabular-nums}
+  .stat{display:flex;justify-content:space-between;gap:10px;padding:2px 0;
+    font-size:11.5px;color:var(--dim)}
+  .stat b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+  .btn{display:block;width:100%;text-align:center;background:var(--accent);
+    color:#1a1206;border:0;border-radius:8px;padding:10px;font:600 13px/1 inherit;
+    cursor:pointer;text-decoration:none;margin-top:4px}
+  .btn:hover{filter:brightness(1.07)}
+  .mini{background:#0c0e11;border:1px solid var(--line);color:var(--dim);
+    border-radius:6px;padding:6px 8px;font:11.5px/1 inherit;cursor:pointer}
+  .mini:hover{color:var(--ink);border-color:var(--accent)}
+  #hint{position:absolute;left:14px;bottom:12px;color:var(--dim);font-size:11px;
+    pointer-events:none;text-shadow:0 1px 3px #000}
+  #badge{position:absolute;right:14px;top:12px;font-size:11px;color:var(--ok);
+    background:#0c0e11cc;border:1px solid var(--line);border-radius:6px;padding:5px 9px}
+  hr{border:0;border-top:1px solid var(--line);margin:14px 0}
+  .note{font-size:11px;color:var(--dim);margin-top:8px;line-height:1.45}
+  .note b{color:var(--warn)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="side">
+    <h1>CELL<span>-4B</span></h1>
+    <div class="sub">Pi 4B · AS7341 · 650 nm speckle · 1.3&quot; OLED</div>
+
+    <div class="lbl">Model</div>
+    <select id="model"></select>
+
+    <div class="lbl" id="partsLbl">Parts</div>
+    <div id="parts"></div>
+
+    <div class="lbl">Selected model</div>
+    <div id="stats"></div>
+
+    <hr>
+    <div class="lbl">Optics</div>
+    <div id="optics"></div>
+
+    <hr>
+    <button class="mini" id="fit">Reset view</button>
+    <div class="note" id="note"></div>
+  </div>
+  <div id="stage">
+    <div id="badge">audit: 108/108</div>
+    <div id="hint">drag orbit · scroll zoom · shift-drag pan</div>
+  </div>
+</div>
+
+<script type="importmap">
+{"imports":{
+  "three":"./vendor/three.module.js",
+  "three/addons/":"./vendor/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0e1013);
+const camera = new THREE.PerspectiveCamera(38, 1, 1, 4000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = .08;
+
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x20242c, 2.1));
+const key = new THREE.DirectionalLight(0xffffff, 2.3); key.position.set(120,-180,220);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x88aaff, 1.0); rim.position.set(-160,140,60);
+scene.add(rim);
+
+const grid = new THREE.GridHelper(400, 40, 0x2a313a, 0x1b2027);
+grid.rotation.x = Math.PI/2;   // model is Z-up
+scene.add(grid);
+
+const root = new THREE.Group(); scene.add(root);
+
+function resize(){
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w,h,false); camera.aspect = w/h; camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+
+let man = null, current = null;
+const modelSel = document.getElementById('model');
+const partsEl  = document.getElementById('parts');
+const statsEl  = document.getElementById('stats');
+const opticsEl = document.getElementById('optics');
+const noteEl   = document.getElementById('note');
+
+const MODELS = [
+  {id:'assembled',    label:'Assembled + components', glb:'assembled.glb'},
+  {id:'printed_only', label:'Assembled (printed only)', glb:'printed_only.glb'},
+  {id:'exploded',     label:'Exploded', glb:'exploded.glb'},
+];
+
+const loader = new GLTFLoader();
+
+function clear(){ while(root.children.length) root.remove(root.children[0]); }
+
+function fitView(){
+  const b = new THREE.Box3().setFromObject(root);
+  if (b.isEmpty()) return;
+  const s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+  const r = Math.max(s.x, s.y, s.z);
+  controls.target.copy(c);
+  camera.position.set(c.x + r*1.05, c.y - r*1.35, c.z + r*0.95);
+  camera.up.set(0,0,1);
+  camera.near = r/200; camera.far = r*30; camera.updateProjectionMatrix();
+  controls.update();
+}
+document.getElementById('fit').onclick = fitView;
+
+function partRows(names){
+  partsEl.innerHTML = '';
+  names.sort();
+  for (const n of names){
+    const o = root.getObjectByName(n);
+    const col = o && o.material ? '#'+o.material.color.getHexString() : '#888';
+    const row = document.createElement('div'); row.className = 'row';
+    const cb = document.createElement('input');
+    cb.type='checkbox'; cb.checked=true; cb.id='cb_'+n;
+    cb.onchange = () => { const t = root.getObjectByName(n); if(t) t.visible = cb.checked; };
+    const sw = document.createElement('span'); sw.className='sw'; sw.style.background=col;
+    const lb = document.createElement('label'); lb.htmlFor = cb.id;
+    lb.textContent = n.replace(/^mock_/,'').replace(/_/g,' ');
+    if (n.startsWith('mock_')) lb.style.color = '#8b95a3';
+    row.append(cb, sw, lb);
+    partsEl.appendChild(row);
+  }
+  document.getElementById('partsLbl').textContent = `Parts (${names.length})`;
+}
+
+function showStats(extra){
+  let tris = 0, meshes = 0;
+  root.traverse(o=>{ if(o.isMesh){ meshes++; tris += o.geometry.index
+      ? o.geometry.index.count/3 : o.geometry.attributes.position.count/3; }});
+  const b = new THREE.Box3().setFromObject(root);
+  const s = b.getSize(new THREE.Vector3());
+  statsEl.innerHTML =
+    `<div class="stat"><span>bodies</span><b>${meshes}</b></div>` +
+    `<div class="stat"><span>triangles</span><b>${tris.toLocaleString()}</b></div>` +
+    `<div class="stat"><span>bounding box</span><b>${s.x.toFixed(0)} × ${s.y.toFixed(0)} × ${s.z.toFixed(0)} mm</b></div>` +
+    (extra||'');
+}
+
+async function load(entry){
+  clear();
+  const g = await loader.loadAsync('../out/glb/' + entry.glb);
+  // Collect FIRST, re-parent after. Calling root.add() inside traverse()
+  // mutates the children array that traverse is walking, which silently skips
+  // half the meshes.
+  const found = [];
+  g.scene.traverse(o => { if (o.isMesh) found.push(o); });
+  const names = [];
+  for (const o of found){
+    o.material.side = THREE.DoubleSide;
+    o.material.flatShading = true;
+    root.add(o);
+    names.push(o.name);
+  }
+  partRows(names);
+  let extra = '';
+  if (entry.plate){
+    const p = man.plates.find(p=>p.glb===entry.glb);
+    if (p) extra = `<div class="stat"><span>plate footprint</span><b>${p.extent[0]} × ${p.extent[1]} mm</b></div>`
+      + `<div class="stat"><span>fits P1S</span><b style="color:${p.fits_p1s?'var(--ok)':'var(--warn)'}">${p.fits_p1s?'yes':'NO'}</b></div>`;
+  }
+  showStats(extra);
+  fitView();
+}
+
+function opticsPanel(){
+  const s = man.spec;
+  const rows = [
+    ['envelope', `${s.envelope[0]} × ${s.envelope[1]} × ${s.envelope[2]} mm`],
+    ['read spot', `(${s.read_spot[0]}, ${s.read_spot[1]}, ${s.read_spot[2]})`],
+    ['aperture', `Ø${s.aperture[0]} × ${s.aperture[1]} mm`],
+    ['head', `Ø${s.head_dia} mm`],
+    ['sensor standoff', `${s.sensor_standoff} mm`],
+  ];
+  let h = rows.map(([k,v])=>`<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
+  h += '<div class="lbl" style="margin-top:12px">Bores</div>';
+  for (const b of s.bores)
+    h += `<div class="stat"><span>${b.name}</span><b>Ø${b.d} · ${b.tilt}° · az ${b.az}°</b></div>`;
+  opticsEl.innerHTML = h;
+  noteEl.innerHTML = `Sensor sits at <b>${s.sensor_standoff} mm</b>, not upstream's `
+    + `${s.sensor_standoff_upstream} mm — a 9 mm standoff is geometrically `
+    + `impossible with 5 mm LEDs at 45°/12 mm. See FINDINGS.md.`;
+}
+
+(async function(){
+  try{
+  man = await (await fetch('../out/manifest.json')).json();
+  const entries = MODELS.concat(man.plates.map(p=>(
+    {id:'plate'+p.id, label:p.title, glb:p.glb, plate:true})));
+  modelSel.innerHTML = entries.map((e,i)=>`<option value="${i}">${e.label}</option>`).join('');
+  modelSel.onchange = () => load(entries[modelSel.value]);
+  opticsPanel();
+  resize();
+  await load(entries[0]);
+  (function tick(){ requestAnimationFrame(tick); controls.update(); renderer.render(scene,camera); })();
+  }catch(err){
+    document.getElementById('badge').style.color='#f87171';
+    document.getElementById('badge').textContent='viewer error';
+    statsEl.innerHTML='<div class="stat" style="color:#f87171">'+
+      (err && err.stack ? err.stack : err)+'</div>';
+    throw err;
+  }
+})();
+</script>
+</body>
+</html>
