@@ -73,7 +73,7 @@
     <div class="note" id="note"></div>
   </div>
   <div id="stage">
-    <div id="badge">audit: 108/108</div>
+    <div id="badge">audit: …</div>
     <div id="hint">drag orbit · scroll zoom · shift-drag pan</div>
   </div>
 </div>
@@ -234,6 +234,10 @@ function opticsPanel(){
     {id:'plate'+p.id, label:p.title, glb:p.glb, plate:true})));
   modelSel.innerHTML = entries.map((e,i)=>`<option value="${i}">${e.label}</option>`).join('');
   modelSel.onchange = () => load(entries[modelSel.value]);
+  const a = man.audit || {};
+  document.getElementById('badge').textContent =
+    `audit: ${(a.checks||0) - (a.failed||0)}/${a.checks||0}`;
+  if (a.failed) document.getElementById('badge').style.color = 'var(--warn)';
   opticsPanel();
   resize();
   await load(entries[0]);

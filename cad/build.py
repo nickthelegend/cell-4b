@@ -103,12 +103,15 @@ def main():
     parts = {n: fn() for n, (fn, _, _) in P.PARTS.items()}
 
     print("running audit ...")
-    ok = audit.report(audit.run(parts), verbose=False)
+    results = audit.run(parts)
+    ok = audit.report(results, verbose=False)
+    n_fail = sum(1 for r in results if r[0] == "FAIL")
     if not ok:
         print("\nAUDIT FAILED -- nothing written. Run cad/audit.py for detail.")
         return 1
 
-    manifest = {"parts": [], "plates": [], "spec": {}, "mocks": []}
+    manifest = {"parts": [], "plates": [], "spec": {}, "mocks": [],
+                "audit": {"checks": len(results), "failed": n_fail}}
 
     # ---- STLs, in print orientation -------------------------------------
     print("\nwriting STLs ...")

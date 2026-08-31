@@ -482,6 +482,49 @@ def check_part_line(meshes):
                 f"{int(both.sum())} of {len(pts)} samples solid in BOTH shells")
 
 
+def check_envelope(meshes):
+    """Nothing may stick out of the case. The only sanctioned exception is the
+    cartridge, which is SUPPOSED to protrude through the front slot."""
+    ok = True
+    lim = {"x": S.ENV_X / 2, "y": S.ENV_Y / 2}
+    for nm, m in meshes.items():
+        if nm.startswith("cartridge"):
+            continue          # modelled in its own frame, not the case frame
+        lo, hi = m.bbox()
+        below = float(lo[2]) < -0.01
+        above = float(hi[2]) > S.ENV_Z + 0.01
+        ok &= _rec(not below, f"envelope/{nm}-above-floor",
+                   f"lowest point Z={lo[2]:.2f}"
+                   + ("  <-- material below the case bottom" if below else ""))
+        ok &= _rec(not above, f"envelope/{nm}-under-ceiling",
+                   f"highest point Z={hi[2]:.2f} vs case top {S.ENV_Z}")
+    return ok
+
+
+def check_mock_fit(mocks_):
+    """Every bought component must live inside the case, with the cartridge
+    allowed to protrude through the slot by exactly the grip length."""
+    ok = True
+    for nm, m in mocks_.items():
+        lo, hi = m.bbox()
+        if nm == "mock_cartridge":
+            proud = -S.ENV_Y / 2 - float(lo[1])
+            ok &= _rec(abs(proud - (S.CART_L - S.STOP2)) < 0.05,
+                       "envelope/cartridge-proud",
+                       f"{proud:.1f} mm proud of the front face "
+                       f"(expect {S.CART_L - S.STOP2:.1f})")
+            continue
+        inside = (float(lo[2]) >= -0.01 and float(hi[2]) <= S.ENV_Z + 0.01
+                  and float(lo[0]) >= -S.ENV_X / 2 - 0.01
+                  and float(hi[0]) <= S.ENV_X / 2 + 0.01
+                  and float(lo[1]) >= -S.ENV_Y / 2 - 0.01
+                  and float(hi[1]) <= S.ENV_Y / 2 + 0.01)
+        ok &= _rec(inside, f"envelope/{nm}",
+                   f"X[{lo[0]:.1f},{hi[0]:.1f}] Y[{lo[1]:.1f},{hi[1]:.1f}] "
+                   f"Z[{lo[2]:.1f},{hi[2]:.1f}]")
+    return ok
+
+
 def check_plates(meshes):
     ok = True
     for nm, m in meshes.items():
@@ -561,6 +604,9 @@ def run(meshes=None, sampled=True):
     check_light_tight()
     check_walls()
     if sampled and meshes:
+        check_envelope(meshes)
+        import mocks as _M
+        check_mock_fit({n: fn() for n, (fn, _c, _a) in _M.MOCKS.items()})
         check_plates(meshes)
         check_corridor(meshes)
         check_pi_bay(meshes)

@@ -295,10 +295,14 @@ def shell_lower():
     m += prism(lap_lower(), S.PART_LINE_Z, S.PART_LINE_Z + S.LAP_H)
 
     # --- Pi standoffs ------------------------------------------------------
+    # Ø6 boss with a Ø2.2 tap hole straight through it, bottoming on the top
+    # face of the floor: a BLIND hole PI_STANDOFF deep, which is 4 mm of
+    # thread engagement for an M2.5 self-tapper. The floor underneath stays
+    # solid -- there is no such thing as "extending the pilot hole downward"
+    # in a kernel with no CSG, and adding a cylinder there just puts four
+    # spikes on the underside of the case.
     for x, y in S.pi_holes():
-        m += _screw_column(x, y, 6.0, S.M25_TAP, S.FLOOR, S.PI_PCB_Z,
-                           hz1=S.PI_PCB_Z - 0.01)
-        m += prism(circle(S.M25_TAP, 24, x, y), S.FLOOR - 6.0, S.FLOOR)
+        m += _screw_column(x, y, 6.0, S.M25_TAP, S.FLOOR, S.PI_PCB_Z)
 
     # --- optical head posts ------------------------------------------------
     for x, y in head_posts_xy():

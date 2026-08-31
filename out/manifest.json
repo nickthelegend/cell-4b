@@ -131,13 +131,13 @@
   {
    "name": "shell_lower",
    "qty": 1,
-   "triangles": 28556,
-   "volume_mm3": 55083.89,
+   "triangles": 27692,
+   "volume_mm3": 54993.55,
    "watertight": true,
    "bbox": [
     92.0,
     128.0,
-    31.6
+    28.0
    ],
    "material": "black PLA",
    "settings": "0.16 mm, 4 perim, 25%",
@@ -362,5 +362,9 @@
    "name": "mock_cartridge",
    "colour": "#EDF1F5"
   }
- ]
+ ],
+ "audit": {
+  "checks": 152,
+  "failed": 0
+ }
 }
