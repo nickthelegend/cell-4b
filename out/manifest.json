@@ -854,5 +854,95 @@
    "detail": "glass top Z=39.70, ceiling underside Z=41.60 -- 1.90 mm",
    "status": "PASS"
   }
+ ],
+ "steps": [
+  {
+   "id": 1,
+   "title": "1 - Pi 4B on its bosses",
+   "adds": [
+    "shell_lower",
+    "mock_pi4b",
+    "mock_switch"
+   ],
+   "glb": "step1.glb"
+  },
+  {
+   "id": 2,
+   "title": "2 - slot baffle",
+   "adds": [
+    "slot_baffle"
+   ],
+   "glb": "step2.glb"
+  },
+  {
+   "id": 3,
+   "title": "3 - emitters into the head",
+   "adds": [
+    "mock_leds",
+    "mock_laser",
+    "mock_camera"
+   ],
+   "glb": "step3.glb"
+  },
+  {
+   "id": 4,
+   "title": "4 - optical head down",
+   "adds": [
+    "optical_head"
+   ],
+   "glb": "step4.glb"
+  },
+  {
+   "id": 5,
+   "title": "5 - CSI ribbon routed",
+   "adds": [
+    "mock_csi_ribbon"
+   ],
+   "glb": "step5.glb"
+  },
+  {
+   "id": 6,
+   "title": "6 - aperture tube",
+   "adds": [
+    "aperture_tube"
+   ],
+   "glb": "step6.glb"
+  },
+  {
+   "id": 7,
+   "title": "7 - sensor deck",
+   "adds": [
+    "sensor_deck"
+   ],
+   "glb": "step7.glb"
+  },
+  {
+   "id": 8,
+   "title": "8 - AS7341 + retainer",
+   "adds": [
+    "mock_as7341",
+    "sensor_carrier"
+   ],
+   "glb": "step8.glb"
+  },
+  {
+   "id": 9,
+   "title": "9 - cartridge in to stop 2",
+   "adds": [
+    "mock_cartridge"
+   ],
+   "glb": "step9.glb"
+  },
+  {
+   "id": 10,
+   "title": "10 - upper shell, OLED, windows",
+   "adds": [
+    "shell_upper",
+    "mock_oled",
+    "oled_bezel",
+    "mock_ring_window"
+   ],
+   "glb": "step10.glb"
+  }
  ]
 }

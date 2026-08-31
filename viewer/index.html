@@ -207,6 +207,10 @@ async function load(entry){
   }
   partRows(names);
   let extra = '';
+  if (entry.step){
+    extra = `<div class="stat"><span>this step adds</span><b>` +
+      entry.step.adds.map(a=>SHORT(a)).join(', ') + `</b></div>`;
+  }
   if (entry.plate){
     const p = man.plates.find(p=>p.glb===entry.glb);
     if (p) extra = `<div class="stat"><span>plate footprint</span><b>${p.extent[0]} × ${p.extent[1]} mm</b></div>`
@@ -271,8 +275,11 @@ function opticsPanel(){
 (async function(){
   try{
   man = await (await fetch('../out/manifest.json')).json();
-  const entries = MODELS.concat(man.plates.map(p=>(
-    {id:'plate'+p.id, label:p.title, glb:p.glb, plate:true})));
+  const entries = MODELS
+    .concat((man.steps||[]).map(st=>(
+      {id:'step'+st.id, label:'Build step '+st.title, glb:st.glb, step:st})))
+    .concat(man.plates.map(p=>(
+      {id:'plate'+p.id, label:p.title, glb:p.glb, plate:true})));
   modelSel.innerHTML = entries.map((e,i)=>`<option value="${i}">${e.label}</option>`).join('');
   modelSel.onchange = () => load(entries[modelSel.value]);
   placementPanel();

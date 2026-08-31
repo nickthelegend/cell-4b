@@ -166,20 +166,68 @@ def main():
     pl.glb_write(os.path.join(GLB, "printed_only.glb"),
                  [(n, m, c, 1.0) for n, m, c in printed_items])
 
-    # exploded: lift each part along Z by its assembly order
-    order = ["shell_lower", "slot_baffle", "optical_head", "aperture_tube",
-             "sensor_deck", "sensor_carrier", "shell_upper", "oled_bezel"]
+    # ---- assembly steps --------------------------------------------------
+    # Each step is what the bench looks like AFTER that step, so the viewer
+    # can be walked forwards like a build. The order is ASSEMBLY.md's, and the
+    # last entry of each step is what was just added.
+    placed_all = dict(P.assembly())
+    mockmap = {n: m for n, m, _c, _a in mock_items}
+    colours = {n: c for n, _m, c, _a in mock_items}
+
+    STEPS = [
+        ("1 - Pi 4B on its bosses", ["shell_lower", "mock_pi4b", "mock_switch"]),
+        ("2 - slot baffle", ["slot_baffle"]),
+        ("3 - emitters into the head", ["mock_leds", "mock_laser", "mock_camera"]),
+        ("4 - optical head down", ["optical_head"]),
+        ("5 - CSI ribbon routed", ["mock_csi_ribbon"]),
+        ("6 - aperture tube", ["aperture_tube"]),
+        ("7 - sensor deck", ["sensor_deck"]),
+        ("8 - AS7341 + retainer", ["mock_as7341", "sensor_carrier"]),
+        ("9 - cartridge in to stop 2", ["mock_cartridge"]),
+        ("10 - upper shell, OLED, windows",
+         ["shell_upper", "mock_oled", "oled_bezel", "mock_ring_window"]),
+    ]
+
+    def look(n):
+        if n in placed_all:
+            return placed_all[n], P.PARTS[n][1], 1.0
+        return mockmap[n], colours.get(n, "#888888"), 1.0
+
+    manifest["steps"] = []
+    running = []
+    for i, (title, added) in enumerate(STEPS, 1):
+        for n in added:
+            m, c, a = look(n)
+            running.append((n, m, c, a))
+        # dim everything already on the bench, so the new part reads clearly
+        items = []
+        for n, m, c, a in running:
+            new = n in added
+            items.append((n, m, c if new else "#4A5058", a if new else 0.55))
+        pl.glb_write(os.path.join(GLB, f"step{i}.glb"), items)
+        manifest["steps"].append({"id": i, "title": title, "adds": added,
+                                  "glb": f"step{i}.glb"})
+        print(f"  step {i:2d}  {title:34s} +{', '.join(added)}")
+
+    # ---- exploded: staged along Z in true assembly order ------------------
+    # Components ride with the part they mount to, rather than being lifted on
+    # an unrelated schedule -- a Pi floating above its own shell is a diagram
+    # of nothing.
+    STAGE = {
+        "shell_lower": 0, "mock_pi4b": 0, "mock_switch": 0, "slot_baffle": 0,
+        "mock_leds": 1, "mock_laser": 1, "mock_camera": 1,
+        "optical_head": 2, "mock_csi_ribbon": 2,
+        "aperture_tube": 3, "sensor_deck": 4,
+        "mock_as7341": 5, "sensor_carrier": 5,
+        "mock_cartridge": 1,
+        "shell_upper": 7, "mock_oled": 7, "oled_bezel": 8,
+        "mock_ring_window": 8,
+    }
+    GAP = 26.0
     exploded = []
-    for i, n in enumerate(order):
-        if n not in parts:
-            continue
-        m = parts[n].copy().translate(0, 0, i * 16.0)
-        exploded.append((n, m, P.PARTS[n][1], 1.0))
-    for n, m, c, a in mock_items:
-        idx = {"mock_pi4b": 0, "mock_switch": 0, "mock_cartridge": 1,
-               "mock_leds": 2, "mock_laser": 2, "mock_camera": 2,
-               "mock_as7341": 5, "mock_oled": 6, "mock_ring_window": 7}.get(n, 3)
-        exploded.append((n, m.copy().translate(0, 0, idx * 16.0 + 8.0), c, a))
+    for n, m, c, a in running:
+        exploded.append((n, m.copy().translate(0, 0, STAGE.get(n, 3) * GAP),
+                         c, a))
     pl.glb_write(os.path.join(GLB, "exploded.glb"), exploded)
 
     # Cutaway: the shells hidden and the optical head made translucent, because
