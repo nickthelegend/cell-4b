@@ -307,6 +307,49 @@ VENT_W, VENT_L = 2.0, 14.0
 
 PLATE_MAX = 250.0           # Bambu P1S usable bed, with margin off 256
 
+# --- CSI ribbon route -------------------------------------------------------
+# The camera sits at 20 mm from the read spot, which is r = 14.14 -- INSIDE the
+# Ø52 head. So 96% of it is buried in the block, and its FFC has to get out and
+# all the way back to the Pi's CSI connector at case (-4.5, 27.6..49.6, ~7.8).
+# That is a 74 mm run and nothing in the design accounted for it.
+#
+# The route leaves the camera pocket through the head's +X side (the pocket
+# already breaches the outer wall there), drops down the channel between the
+# head and the wall, crosses the corridor between the head and the Pi, and
+# comes up over the board. Waypoints are the ribbon's CENTRELINE.
+# An FFC is FLAT -- 16 x 0.3 mm -- not a round cable. Demanding an 18 mm
+# circular corridor the whole way is the wrong physical model and fails in
+# places a real ribbon passes through easily: the gap between the head's back
+# edge (Y = -6.4) and the Pi's near edge (Y = +5.6) is only 12 mm wide, but it
+# is 20 mm TALL, so a ribbon standing on edge goes through it without touching
+# anything. Each waypoint therefore carries its orientation:
+#
+#   'h'  flat, width horizontal   -- lying on the floor, or over the Pi
+#   'v'  on edge, width vertical  -- threading a narrow but tall gap
+CABLE_W = 16.0              # FFC width
+CABLE_T = 0.3               # FFC thickness
+CABLE_CLEAR = 1.0           # each side of the width
+CABLE_BEND = 1.2            # slack across the thickness, for the bend radius
+
+CABLE_ROUTE = [
+    (24.0, -32.4, 21.0, 'h'),   # at the camera's FFC connector, in the pocket
+    (31.0, -32.4, 17.0, 'v'),   # out through the head's side, turning on edge
+    (31.0, -20.0, 15.0, 'v'),   # on edge down the +X channel: flat here would
+    #                             need 18 mm of width and the head's shoulder
+    #                             is at X = 23 with a boss beyond X = 34.8
+    (31.0,   0.0, 15.0, 'v'),   # north, past the head's back edge at Y = -6.4
+    ( 0.0,   0.0, 17.0, 'v'),   # west through the 12 mm head/Pi gap, on edge
+    (-4.5,   0.0, 19.0, 'h'),   # lie flat at Y = 0, BEFORE turning north. Doing
+    #                             this turn at Y = 4 put the on-edge ribbon's
+    #                             lower half at Z = 10.5 inside the GPIO header
+    (-4.5,  14.0, 21.0, 'h'),   # crossing the header, whose top is at 16.3
+    (-4.5,  24.0, 21.0, 'h'),   # across the board, clear of the SoC
+    (-4.5,  31.0, 15.0, 'h'),   # stops just above the CSI connector's 13.3 lid
+]
+# The last 2 mm is the plug going into the socket, so the corridor check stops
+# above it -- otherwise the ribbon "collides" with its own destination.
+CABLE_PLUG_Z = 13.3
+
 
 # ==========================================================================
 # derived helpers

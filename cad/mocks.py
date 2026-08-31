@@ -173,7 +173,9 @@ def cartridge_in_place():
 # between the head, the boss at (38, -58) and the front wall.
 # 34, not 32: at 32 it sat exactly MIN_CLEAR from the camera board, which
 # reaches r = 26.6 at azimuth 0 on its way out of the head.
-SWITCH_CX, SWITCH_CY = 34.0, -44.0
+# Moved to -X entirely: the +X side now carries the CSI ribbon, which
+# passed within 0.33 mm of the switch at (34, -44).
+SWITCH_CX, SWITCH_CY = -30.0, -50.0
 
 
 def switch():
@@ -182,7 +184,62 @@ def switch():
     return prism(g, S.FLOOR, S.FLOOR + S.SWITCH_H)
 
 
+def csi_ribbon():
+    """The CSI ribbon, swept along CABLE_ROUTE so you can SEE where it goes.
+
+    Built as a chain of thin slabs, each oriented to that segment's 'h' / 'v'
+    flag -- the same orientation the corridor check uses, so what you see is
+    what was verified.
+    """
+    import numpy as np
+    m = Mesh()
+    half, halft = S.CABLE_W / 2, S.CABLE_T / 2 + 0.3
+    for wa, wb in zip(S.CABLE_ROUTE, S.CABLE_ROUTE[1:]):
+        a, b = np.array(wa[:3], float), np.array(wb[:3], float)
+        seg = float(np.linalg.norm(b - a))
+        if seg < 1e-6:
+            continue
+        d = (b - a) / seg
+        if wa[3] == 'v':
+            w = np.array([0.0, 0.0, 1.0]) - d * float(np.dot([0, 0, 1.0], d))
+        else:
+            w = np.cross(d, [0.0, 0.0, 1.0])
+            if np.linalg.norm(w) < 1e-6:
+                w = np.cross(d, [1.0, 0.0, 0.0])
+        if np.linalg.norm(w) < 1e-6:
+            continue
+        w /= np.linalg.norm(w)
+        t = np.cross(d, w)
+        t /= (np.linalg.norm(t) or 1.0)
+        # eight corners of the slab -> one closed shell
+        quad = [(+half, +halft), (+half, -halft), (-half, -halft), (-half, +halft)]
+        ring0 = [a + u * w + v * t for u, v in quad]
+        ring1 = [b + u * w + v * t for u, v in quad]
+        sh = Mesh(weld=True)
+        idx0 = [sh._pt(*p) for p in ring0]
+        idx1 = [sh._pt(*p) for p in ring1]
+        for i in range(4):
+            j = (i + 1) % 4
+            sh.F.append((idx0[i], idx0[j], idx1[j]))
+            sh.F.append((idx0[i], idx1[j], idx1[i]))
+        sh.F.append((idx0[0], idx0[2], idx0[1]))
+        sh.F.append((idx0[0], idx0[3], idx0[2]))
+        sh.F.append((idx1[0], idx1[1], idx1[2]))
+        sh.F.append((idx1[0], idx1[2], idx1[3]))
+        # (w, t, d) can come out left-handed depending on the segment, which
+        # inverts the shell. Flip the whole slab if its signed volume is
+        # negative -- an inverted shell breaks every point-in-solid test.
+        V = np.asarray(sh.V, float)
+        vol = sum(float(np.dot(V[a_], np.cross(V[b_], V[c_]))) / 6.0
+                  for a_, b_, c_ in sh.F)
+        if vol < 0:
+            sh.F = [(c_, b_, a_) for a_, b_, c_ in sh.F]
+        m += sh
+    return m
+
+
 MOCKS = {
+    "mock_csi_ribbon": (csi_ribbon, "#C8A24A", 1.0),
     "mock_pi4b": (pi4b, "#1E6B4E", 1.0),
     "mock_as7341": (as7341, "#2B6CB0", 1.0),
     "mock_camera": (camera, "#3B4A5A", 1.0),

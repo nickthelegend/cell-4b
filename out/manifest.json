@@ -327,6 +327,10 @@
  },
  "mocks": [
   {
+   "name": "mock_csi_ribbon",
+   "colour": "#C8A24A"
+  },
+  {
    "name": "mock_pi4b",
    "colour": "#1E6B4E"
   },
@@ -364,7 +368,7 @@
   }
  ],
  "audit": {
-  "checks": 268,
+  "checks": 304,
   "failed": 0
  },
  "gaps": [
@@ -516,6 +520,13 @@
    "status": "PASS"
   },
   {
+   "a": "mock_csi_ribbon",
+   "b": "mock_pi4b",
+   "kind": "clear",
+   "mm": 1.36,
+   "status": "PASS"
+  },
+  {
    "a": "sensor_carrier",
    "b": "sensor_deck",
    "kind": "contact",
@@ -530,6 +541,13 @@
    "status": "PASS"
   },
   {
+   "a": "mock_switch",
+   "b": "optical_head",
+   "kind": "clear",
+   "mm": 1.86,
+   "status": "PASS"
+  },
+  {
    "a": "aperture_tube",
    "b": "mock_cartridge",
    "kind": "clear",
@@ -539,6 +557,13 @@
   {
    "a": "aperture_tube",
    "b": "mock_leds",
+   "kind": "clear",
+   "mm": 2.14,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_camera",
+   "b": "mock_csi_ribbon",
    "kind": "clear",
    "mm": 2.14,
    "status": "PASS"
@@ -562,13 +587,6 @@
    "b": "shell_upper",
    "kind": "clear",
    "mm": 2.4,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_camera",
-   "b": "mock_switch",
-   "kind": "clear",
-   "mm": 2.49,
    "status": "PASS"
   },
   {
@@ -607,6 +625,20 @@
    "status": "PASS"
   },
   {
+   "a": "mock_csi_ribbon",
+   "b": "shell_lower",
+   "kind": "clear",
+   "mm": 3.32,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_csi_ribbon",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 3.62,
+   "status": "PASS"
+  },
+  {
    "a": "optical_head",
    "b": "sensor_carrier",
    "kind": "clear",
@@ -628,6 +660,13 @@
    "status": "PASS"
   },
   {
+   "a": "mock_csi_ribbon",
+   "b": "optical_head",
+   "kind": "clear",
+   "mm": 4.59,
+   "status": "PASS"
+  },
+  {
    "a": "mock_as7341",
    "b": "mock_ring_window",
    "kind": "clear",
@@ -639,13 +678,6 @@
    "b": "sensor_deck",
    "kind": "clear",
    "mm": 4.67,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_switch",
-   "b": "optical_head",
-   "kind": "clear",
-   "mm": 4.84,
    "status": "PASS"
   },
   {
@@ -705,6 +737,13 @@
    "status": "PASS"
   },
   {
+   "a": "mock_csi_ribbon",
+   "b": "mock_leds",
+   "kind": "clear",
+   "mm": 11.5,
+   "status": "PASS"
+  },
+  {
    "a": "mock_camera",
    "b": "shell_upper",
    "kind": "clear",
@@ -726,10 +765,31 @@
    "status": "PASS"
   },
   {
+   "a": "aperture_tube",
+   "b": "mock_csi_ribbon",
+   "kind": "clear",
+   "mm": 19.78,
+   "status": "PASS"
+  },
+  {
    "a": "mock_leds",
    "b": "shell_upper",
    "kind": "clear",
    "mm": 21.11,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_csi_ribbon",
+   "b": "mock_laser",
+   "kind": "clear",
+   "mm": 21.34,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_cartridge",
+   "b": "mock_csi_ribbon",
+   "kind": "clear",
+   "mm": 21.75,
    "status": "PASS"
   }
  ],

@@ -139,6 +139,46 @@ Tightest ten, contacts excluded:
 | AS7341 ↔ laser | 2.27 mm |
 | sensor carrier ↔ shell upper | 2.40 mm |
 
+### The CSI ribbon — the gap the render exposed
+
+"Where is the camera?" turned out to be the right question. It is at r = 14.1
+from the read spot, **inside** the Ø52 head, so **96% of its vertices sit
+within the head's outer radius** and it is invisible from every angle. That is
+forced by the optics: upstream fixes the lensless sensor at 20 mm from the
+spot, and at 45° that lands inside the block.
+
+The consequence was not cosmetic. **Nothing in the design accounted for the
+ribbon.** No route, no channel, no check — the camera could not have been
+connected.
+
+`CABLE_ROUTE` now declares a 9-waypoint centreline, and each waypoint carries
+the ribbon's orientation, because an FFC is **flat** (16 × 0.3 mm), not round:
+
+| | |
+|---|---|
+| `'h'` | flat, width horizontal — on the floor, or over the Pi |
+| `'v'` | on edge, width vertical — threading a narrow but tall gap |
+
+That distinction is load-bearing. Demanding an 18 mm round corridor fails in
+the gap between the head's back edge (Y = −6.4) and the Pi's near edge
+(Y = +5.6): it is only **12 mm wide but 20 mm tall**, so a ribbon on edge goes
+through untouched while a round cable cannot.
+
+**Route: 110 mm.** A 150 mm ribbon is comfortable; 100 mm will not reach.
+
+Three real blockages found and fixed while getting it clear:
+
+1. The descent down the +X channel was flat, wanting 18 mm of width — the
+   head's shoulder is at X = 23 and a boss starts at X = 34.8. Turned on edge.
+2. Turning north at Y = 4 put the on-edge ribbon's lower half at **Z = 10.5,
+   inside the GPIO header** (top 16.3). The turn now happens at Y = 0.
+3. The microswitch sat **0.33 mm** from the ribbon. Moved to −X entirely.
+
+One "failure" was the check being wrong, not the route: the last few samples
+land inside the CSI socket, because that is where the ribbon is *going*. The
+plug neighbourhood is now excluded and replaced with a positive
+`cable/reaches-connector` assertion.
+
 ### What this pass found
 
 Seven more defects, all of which would have printed:

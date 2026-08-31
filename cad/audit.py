@@ -675,6 +675,89 @@ def check_interference(meshes, mocks_):
     return ok
 
 
+def check_cable_route(meshes, mocks_):
+    """The camera's FFC has to physically get to the Pi's CSI connector.
+
+    96% of the camera body sits inside the head's outer radius, so its ribbon
+    starts buried. This walks the declared centreline and checks that a
+    CABLE_W-wide corridor stays clear of every placed part the whole way.
+    """
+    ok = True
+    allm = dict(P.assembly())
+    # the camera is the ribbon's source and the ribbon IS the corridor, so
+    # neither can be an obstacle to it
+    allm.update({k: v for k, v in mocks_.items()
+                 if k not in ("mock_camera", "mock_csi_ribbon")})
+    half = S.CABLE_W / 2 + S.CABLE_CLEAR
+
+    halft = S.CABLE_T / 2 + S.CABLE_BEND
+    pts, total = [], 0.0
+    for (wa, wb) in zip(S.CABLE_ROUTE, S.CABLE_ROUTE[1:]):
+        a, b = np.array(wa[:3], float), np.array(wb[:3], float)
+        seg = float(np.linalg.norm(b - a))
+        total += seg
+        d = (b - a) / (seg or 1.0)
+        # The ribbon's WIDTH axis: vertical when it travels on edge, otherwise
+        # horizontal and perpendicular to travel. The THICKNESS axis is then
+        # whatever is left.
+        if wa[3] == 'v':
+            width = np.array([0.0, 0.0, 1.0])
+            width = width - d * float(np.dot(width, d))
+        else:
+            width = np.cross(d, [0.0, 0.0, 1.0])
+            if np.linalg.norm(width) < 1e-6:
+                width = np.cross(d, [1.0, 0.0, 0.0])
+        n = np.linalg.norm(width)
+        if n < 1e-6:
+            continue
+        width /= n
+        thick = np.cross(d, width)
+        thick /= (np.linalg.norm(thick) or 1.0)
+        for t in np.linspace(0, 1, max(3, int(seg / 2.5))):
+            c = a + t * (b - a)
+            for u in (-half, -half / 2, 0.0, half / 2, half):
+                for v in (-halft, halft):
+                    pts.append(c + u * width + v * thick)
+    pts = np.array(pts)
+
+    # Drop samples in the immediate neighbourhood of the plug: the last few mm
+    # ARE inside the connector, because that is where the ribbon is going.
+    end = np.array(S.CABLE_ROUTE[-1][:3], float)
+    keep = np.linalg.norm(pts - end, axis=1) > 3.0
+    plug_pts, pts = pts[~keep], pts[keep]
+
+    for nm, m in sorted(allm.items()):
+        bad = _inside(m, pts)
+        ok &= _rec(not bad.any(), f"cable/{nm}",
+                   f"{int(bad.sum())} of {len(pts)} corridor samples land "
+                   f"inside {nm}")
+
+    # ...and check positively that the plug end really is over the socket,
+    # rather than just excusing it.
+    ex, ey, ez = end
+    over = (S.PI_CSI_CX - 1.2 - 3 <= 0 or True)
+    cx, cy0 = S.pi_to_case(S.PI_CSI_CX, 34.0)
+    _, cy1 = S.pi_to_case(S.PI_CSI_CX, 12.0)
+    ok &= _rec(abs(ex - cx) <= 2.0 and min(cy0, cy1) <= ey <= max(cy0, cy1)
+               and ez > S.CABLE_PLUG_Z,
+               "cable/reaches-connector",
+               f"route ends at ({ex:.1f}, {ey:.1f}, {ez:.1f}); the CSI socket "
+               f"is at X={cx:.1f}, Y={min(cy0, cy1):.1f}..{max(cy0, cy1):.1f}, "
+               f"lid at Z={S.CABLE_PLUG_Z}")
+    _rec(True, "cable/length",
+         f"{total:.0f} mm of routed centreline from the camera's FFC to the "
+         f"CSI connector; a {S.CABLE_W:.0f} mm ribbon needs "
+         f"{2 * half:.0f} mm of corridor")
+    # the ribbon must actually be able to leave the head
+    exit_pt = np.array([S.CABLE_ROUTE[1][:3]], float)
+    inside_head = bool(_inside(meshes["optical_head"], exit_pt)[0])
+    ok &= _rec(not inside_head, "cable/exits-head",
+               f"the pocket breaches the head's side wall at "
+               f"({S.CABLE_ROUTE[1][0]:.0f}, {S.CABLE_ROUTE[1][1]:.0f}, "
+               f"{S.CABLE_ROUTE[1][2]:.0f}), so the FFC has a way out")
+    return ok
+
+
 def check_plates(meshes):
     ok = True
     for nm, m in meshes.items():
@@ -759,6 +842,7 @@ def run(meshes=None, sampled=True):
         mk = {n: fn() for n, (fn, _c, _a) in _M.MOCKS.items()}
         check_mock_fit(mk)
         check_seating(mk)
+        check_cable_route(meshes, mk)
         check_interference(meshes, mk)
         check_plates(meshes)
         check_corridor(meshes)

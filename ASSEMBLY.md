@@ -89,9 +89,19 @@ Fit everything into the head **before** it goes into the shell, and before
    to face 90/270 — do not rotate the board.
 3. **Camera** on the 45° bore at azimuth 225°, lens **removed**, sensor facing
    the spot at 20 mm.
-4. **`aperture_tube`**, flange up, into the central counterbore.
-5. **`sensor_deck`** on top, four M2.5 into the head posts.
-6. **AS7341** on `sensor_carrier`, chip **DOWN** over the relief shaft, then
+4. **Route the CSI ribbon before the deck goes on.** This is the step that is
+   easy to leave until too late. The camera sits at r = 14.1 mm from the read
+   spot — **inside** the Ø52 head — so 96% of it is buried and its ribbon
+   starts in a blind pocket. It leaves through the head's +X side wall, turns
+   **on edge** to drop down the channel between the head and the case wall,
+   crosses the 12 mm gap between the head and the Pi still on edge, then lies
+   **flat** again and goes up and over the GPIO header into the CSI socket.
+   That is a **110 mm** run; a 150 mm ribbon is comfortable, a 100 mm one will
+   not reach. `cad/spec.py: CABLE_ROUTE` has the waypoints and
+   `audit.check_cable_route()` verifies the whole corridor is clear.
+5. **`aperture_tube`**, flange up, into the central counterbore.
+6. **`sensor_deck`** on top, four M2.5 into the head posts.
+7. **AS7341** on `sensor_carrier`, chip **DOWN** over the relief shaft, then
    onto the deck. **Long axis along X.**
 
 Then drop the head onto the four posts in `shell_lower` and screw down. Its

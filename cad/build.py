@@ -182,6 +182,20 @@ def main():
         exploded.append((n, m.copy().translate(0, 0, idx * 16.0 + 8.0), c, a))
     pl.glb_write(os.path.join(GLB, "exploded.glb"), exploded)
 
+    # Cutaway: the shells hidden and the optical head made translucent, because
+    # the camera sits at r = 14.1 -- INSIDE the Ø52 head -- and is otherwise
+    # completely invisible in every other view.
+    placed = P.assembly()
+    cut = [("optical_head", placed["optical_head"], "#5A6270", 0.28),
+           ("sensor_deck", placed["sensor_deck"], "#5A6270", 0.35),
+           ("aperture_tube", placed["aperture_tube"], "#2E3238", 1.0),
+           ("slot_baffle", placed["slot_baffle"], "#2E3238", 1.0)]
+    for n, m, c, a in mock_items:
+        if n in ("mock_oled", "mock_ring_window"):
+            continue
+        cut.append((n, m, c, a))
+    pl.glb_write(os.path.join(GLB, "cutaway.glb"), cut)
+
     # ---- plates ----------------------------------------------------------
     print("\npacking plates ...")
     for i, (title, names) in enumerate(PLATES, 1):
