@@ -67,8 +67,8 @@
   {
    "name": "optical_head",
    "qty": 1,
-   "triangles": 178664,
-   "volume_mm3": 56516.15,
+   "triangles": 138736,
+   "volume_mm3": 45392.91,
    "watertight": true,
    "bbox": [
     52.0,
@@ -83,8 +83,8 @@
   {
    "name": "sensor_deck",
    "qty": 1,
-   "triangles": 1828,
-   "volume_mm3": 4831.9,
+   "triangles": 1796,
+   "volume_mm3": 4797.8,
    "watertight": true,
    "bbox": [
     52.0,
@@ -100,12 +100,12 @@
    "name": "slot_baffle",
    "qty": 1,
    "triangles": 24,
-   "volume_mm3": 308.16,
+   "volume_mm3": 82.18,
    "watertight": true,
    "bbox": [
     36.0,
     2.4,
-    6.0
+    1.6
    ],
    "material": "black PLA",
    "settings": "0.16 mm, 4 perim, 100%",
@@ -148,12 +148,12 @@
    "name": "shell_upper",
    "qty": 1,
    "triangles": 9184,
-   "volume_mm3": 35266.82,
+   "volume_mm3": 37612.22,
    "watertight": true,
    "bbox": [
     92.0,
     128.0,
-    16.0
+    18.0
    ],
    "material": "black PLA",
    "settings": "0.16 mm, 4 perim, 25%",
@@ -164,12 +164,12 @@
    "name": "oled_bezel",
    "qty": 1,
    "triangles": 592,
-   "volume_mm3": 1901.8,
+   "volume_mm3": 1141.08,
    "watertight": true,
    "bbox": [
     38.5,
     36.5,
-    2.0
+    1.2
    ],
    "material": "black PLA",
    "settings": "0.12 mm, 4 perim, 100%",
@@ -179,13 +179,13 @@
   {
    "name": "sensor_carrier",
    "qty": 1,
-   "triangles": 1120,
-   "volume_mm3": 2674.0,
+   "triangles": 736,
+   "volume_mm3": 1005.25,
    "watertight": true,
    "bbox": [
-    36.5,
-    29.0,
-    4.0
+    35.5,
+    28.0,
+    1.8
    ],
    "material": "black PLA",
    "settings": "0.16 mm, 4 perim, 100%",
@@ -234,7 +234,7 @@
    },
    "extent": [
     214.5,
-    85.0
+    84.0
    ],
    "fits_p1s": true,
    "glb": "plate3.glb"
@@ -259,7 +259,7 @@
   "envelope": [
    92.0,
    128.0,
-   42.0
+   44.0
   ],
   "read_spot": [
    0.0,
@@ -278,19 +278,19 @@
     "name": "led1",
     "d": 5.4,
     "tilt": 45.0,
-    "az": 0.0
+    "az": 45.0
    },
    {
     "name": "led2",
     "d": 5.4,
     "tilt": 45.0,
-    "az": 180.0
+    "az": 225.0
    },
    {
     "name": "ir",
     "d": 5.4,
     "tilt": 45.0,
-    "az": 90.0
+    "az": 135.0
    },
    {
     "name": "laser",
@@ -302,7 +302,7 @@
     "name": "camera",
     "d": 6.0,
     "tilt": 45.0,
-    "az": 225.0
+    "az": 0.0
    }
   ],
   "pi_holes": [
@@ -364,7 +364,435 @@
   }
  ],
  "audit": {
-  "checks": 152,
+  "checks": 268,
   "failed": 0
- }
+ },
+ "gaps": [
+  {
+   "a": "mock_as7341",
+   "b": "sensor_carrier",
+   "kind": "contact",
+   "mm": 0.0,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_as7341",
+   "b": "sensor_deck",
+   "kind": "contact",
+   "mm": 0.0,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_cartridge",
+   "b": "shell_lower",
+   "kind": "contact",
+   "mm": 0.0,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_oled",
+   "b": "shell_upper",
+   "kind": "contact",
+   "mm": 0.0,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_pi4b",
+   "b": "shell_lower",
+   "kind": "contact",
+   "mm": 0.0,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_ring_window",
+   "b": "shell_upper",
+   "kind": "contact",
+   "mm": 0.0,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_switch",
+   "b": "shell_lower",
+   "kind": "contact",
+   "mm": 0.0,
+   "status": "PASS"
+  },
+  {
+   "a": "oled_bezel",
+   "b": "shell_upper",
+   "kind": "contact",
+   "mm": 0.0,
+   "status": "PASS"
+  },
+  {
+   "a": "optical_head",
+   "b": "sensor_deck",
+   "kind": "contact",
+   "mm": 0.0,
+   "status": "PASS"
+  },
+  {
+   "a": "optical_head",
+   "b": "shell_lower",
+   "kind": "contact",
+   "mm": 0.0,
+   "status": "PASS"
+  },
+  {
+   "a": "shell_lower",
+   "b": "shell_upper",
+   "kind": "contact",
+   "mm": 0.0,
+   "status": "PASS"
+  },
+  {
+   "a": "aperture_tube",
+   "b": "optical_head",
+   "kind": "contact",
+   "mm": 0.02,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_leds",
+   "b": "optical_head",
+   "kind": "contact",
+   "mm": 0.07,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_camera",
+   "b": "optical_head",
+   "kind": "contact",
+   "mm": 0.13,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_cartridge",
+   "b": "slot_baffle",
+   "kind": "slide",
+   "mm": 0.3,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_laser",
+   "b": "optical_head",
+   "kind": "contact",
+   "mm": 0.3,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_cartridge",
+   "b": "optical_head",
+   "kind": "contact",
+   "mm": 0.45,
+   "status": "PASS"
+  },
+  {
+   "a": "shell_lower",
+   "b": "slot_baffle",
+   "kind": "contact",
+   "mm": 0.6,
+   "status": "PASS"
+  },
+  {
+   "a": "optical_head",
+   "b": "slot_baffle",
+   "kind": "clear",
+   "mm": 1.0,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_camera",
+   "b": "mock_leds",
+   "kind": "clear",
+   "mm": 1.14,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_laser",
+   "b": "sensor_deck",
+   "kind": "clear",
+   "mm": 1.19,
+   "status": "PASS"
+  },
+  {
+   "a": "sensor_carrier",
+   "b": "sensor_deck",
+   "kind": "contact",
+   "mm": 1.6,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_as7341",
+   "b": "optical_head",
+   "kind": "clear",
+   "mm": 1.72,
+   "status": "PASS"
+  },
+  {
+   "a": "aperture_tube",
+   "b": "mock_cartridge",
+   "kind": "clear",
+   "mm": 2.06,
+   "status": "PASS"
+  },
+  {
+   "a": "aperture_tube",
+   "b": "mock_leds",
+   "kind": "clear",
+   "mm": 2.14,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_pi4b",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 2.2,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_as7341",
+   "b": "mock_laser",
+   "kind": "clear",
+   "mm": 2.27,
+   "status": "PASS"
+  },
+  {
+   "a": "sensor_carrier",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 2.4,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_camera",
+   "b": "mock_switch",
+   "kind": "clear",
+   "mm": 2.49,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_laser",
+   "b": "sensor_carrier",
+   "kind": "clear",
+   "mm": 2.79,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_camera",
+   "b": "mock_laser",
+   "kind": "clear",
+   "mm": 2.97,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_oled",
+   "b": "oled_bezel",
+   "kind": "contact",
+   "mm": 3.1,
+   "status": "PASS"
+  },
+  {
+   "a": "optical_head",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 3.21,
+   "status": "PASS"
+  },
+  {
+   "a": "sensor_deck",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 3.21,
+   "status": "PASS"
+  },
+  {
+   "a": "optical_head",
+   "b": "sensor_carrier",
+   "kind": "clear",
+   "mm": 4.0,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_as7341",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 4.2,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_ring_window",
+   "b": "sensor_carrier",
+   "kind": "clear",
+   "mm": 4.48,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_as7341",
+   "b": "mock_ring_window",
+   "kind": "clear",
+   "mm": 4.6,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_camera",
+   "b": "sensor_deck",
+   "kind": "clear",
+   "mm": 4.67,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_switch",
+   "b": "optical_head",
+   "kind": "clear",
+   "mm": 4.84,
+   "status": "PASS"
+  },
+  {
+   "a": "aperture_tube",
+   "b": "shell_lower",
+   "kind": "clear",
+   "mm": 5.0,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_camera",
+   "b": "shell_lower",
+   "kind": "clear",
+   "mm": 5.12,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_laser",
+   "b": "mock_leds",
+   "kind": "clear",
+   "mm": 6.05,
+   "status": "PASS"
+  },
+  {
+   "a": "sensor_deck",
+   "b": "shell_lower",
+   "kind": "clear",
+   "mm": 6.34,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_cartridge",
+   "b": "mock_leds",
+   "kind": "clear",
+   "mm": 6.9,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_leds",
+   "b": "shell_lower",
+   "kind": "clear",
+   "mm": 8.27,
+   "status": "PASS"
+  },
+  {
+   "a": "aperture_tube",
+   "b": "mock_camera",
+   "kind": "clear",
+   "mm": 9.01,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_laser",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 9.69,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_camera",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 12.97,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_camera",
+   "b": "mock_cartridge",
+   "kind": "clear",
+   "mm": 14.27,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_laser",
+   "b": "shell_lower",
+   "kind": "clear",
+   "mm": 15.5,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_leds",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 21.11,
+   "status": "PASS"
+  }
+ ],
+ "seats": [
+  {
+   "name": "led1-on-axis",
+   "detail": "emitter face at (+6.00, -26.40, 13.89), 12.000 mm from the read spot on its own axis",
+   "status": "PASS"
+  },
+  {
+   "name": "led2-on-axis",
+   "detail": "emitter face at (-6.00, -38.40, 13.89), 12.000 mm from the read spot on its own axis",
+   "status": "PASS"
+  },
+  {
+   "name": "ir-on-axis",
+   "detail": "emitter face at (-6.00, -26.40, 13.89), 12.000 mm from the read spot on its own axis",
+   "status": "PASS"
+  },
+  {
+   "name": "laser-on-axis",
+   "detail": "emitter face at (-0.00, -43.40, 24.45), 22.000 mm from the read spot on its own axis",
+   "status": "PASS"
+  },
+  {
+   "name": "camera-on-axis",
+   "detail": "emitter face at (+14.14, -32.40, 19.54), 20.000 mm from the read spot on its own axis",
+   "status": "PASS"
+  },
+  {
+   "name": "as7341-over-shaft",
+   "detail": "die offset 0.00 mm from the board centre vs a \u00d85.0 shaft -- ASSUMED (0,0); confirm on your board",
+   "status": "PASS"
+  },
+  {
+   "name": "as7341-on-deck",
+   "detail": "board 35.80..37.40, on a deck top of Z=35.80; the die hangs to Z=34.80 in the shaft",
+   "status": "PASS"
+  },
+  {
+   "name": "as7341-long-axis-x",
+   "detail": "30.5 along X x 23.0 along Y -- the narrow side must face the laser exit at az 270",
+   "status": "PASS"
+  },
+  {
+   "name": "cartridge-well-on-spot",
+   "detail": "well centre Y=-32.40, read spot Y=-32.40",
+   "status": "PASS"
+  },
+  {
+   "name": "cartridge-in-slot",
+   "detail": "body sits on the slot floor at Z=3.0; sample plane Z=5.4",
+   "status": "PASS"
+  },
+  {
+   "name": "pi-on-bosses",
+   "detail": "PCB underside Z=6.4, on 4.0 mm bosses; microSD hangs to Z=4.40",
+   "status": "PASS"
+  },
+  {
+   "name": "oled-under-ceiling",
+   "detail": "glass top Z=39.70, ceiling underside Z=41.60 -- 1.90 mm",
+   "status": "PASS"
+  }
+ ]
 }

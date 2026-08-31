@@ -12,6 +12,7 @@ import math
 from shapely.geometry import box
 from shapely.ops import unary_union
 
+import bodies as BD
 import partlib as pl
 from partlib import Bore, Mesh, circle, prism, rounded_rect
 import parts as P
@@ -97,7 +98,7 @@ def pi4b():
 def as7341():
     """Breakout on the sensor deck, chip DOWN over the relief shaft.
     Long axis along X -- that orientation is load-bearing, see audit."""
-    z = S.HEAD_TOP + 2.4
+    z = S.HEAD_TOP + P.DECK_T
     m = Mesh()
     board = pl.affinity.translate(
         rounded_rect(S.AS_PCB_L, S.AS_PCB_W, 2.0), S.RS_X, S.RS_Y)
@@ -112,31 +113,17 @@ def as7341():
 
 
 def camera():
-    """OV5647 with the lens REMOVED, on the speckle bore at CAMERA_SLANT."""
-    tilt, az = S.CAMERA_ANGLE, S.AZ_CAMERA
-    m = Mesh()
-    m += prism(rounded_rect(S.CAM_PCB_L, S.CAM_PCB_W, 2.0),
-               S.CAMERA_SLANT, S.CAMERA_SLANT + S.CAM_PCB_T)
-    m += prism(box(-S.CAM_SENSOR / 2, -S.CAM_SENSOR / 2,
-                   S.CAM_SENSOR / 2, S.CAM_SENSOR / 2),
-               S.CAMERA_SLANT - 1.2, S.CAMERA_SLANT)
-    m += prism(box(-S.CAM_FFC_W / 2, -S.CAM_PCB_W / 2 - 6.0,
-                   S.CAM_FFC_W / 2, -S.CAM_PCB_W / 2),
-               S.CAMERA_SLANT + S.CAM_PCB_T, S.CAMERA_SLANT + S.CAM_PCB_T + 1.2)
-    return _axis_solid(m, tilt, az, S.RS_X, S.RS_Y, S.Z_SAMPLE)
+    return BD.camera_body()
 
 
 def laser():
-    m, _ = _on_bore("laser", S.LASER_BODY_D, S.LASER_BODY_L, S.LASER_SLANT,
-                    "#B04A4A")
-    return m
+    return BD.laser_body()
 
 
 def leds():
     out = Mesh()
     for nm in ("led1", "led2", "ir"):
-        m, _ = _on_bore(nm, S.LED_BODY_D, 8.6, S.LED_SLANT, "#DDDDDD")
-        out += m
+        out += BD.led_body(nm)
     return out
 
 
@@ -178,10 +165,20 @@ def cartridge_in_place():
     return m.translate(0.0, y_tip, S.SLOT_Z0)
 
 
+# Cartridge-present microswitch, beside the cartridge channel.
+#
+# Long axis along Y. A 20 mm body laid across X does not fit between the Ø52
+# head and the inner wall at 43.6, and every azimuth that clears the head runs
+# into one of the corner bosses. Turned 90 degrees it drops into the gap
+# between the head, the boss at (38, -58) and the front wall.
+# 34, not 32: at 32 it sat exactly MIN_CLEAR from the camera board, which
+# reaches r = 26.6 at azimuth 0 on its way out of the head.
+SWITCH_CX, SWITCH_CY = 34.0, -44.0
+
+
 def switch():
-    p = S.polar(S.HEAD_DIA / 2 + 6.0, 200.0)
-    g = box(p[0] - S.SWITCH_L / 2, p[1] - S.SWITCH_W / 2,
-            p[0] + S.SWITCH_L / 2, p[1] + S.SWITCH_W / 2)
+    g = box(SWITCH_CX - S.SWITCH_W / 2, SWITCH_CY - S.SWITCH_L / 2,
+            SWITCH_CX + S.SWITCH_W / 2, SWITCH_CY + S.SWITCH_L / 2)
     return prism(g, S.FLOOR, S.FLOOR + S.SWITCH_H)
 
 

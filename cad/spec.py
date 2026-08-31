@@ -90,9 +90,9 @@ CAMERA_BORE = 6.0                            # lensless CSI clear aperture.
 # The AS7341 board's LONG axis runs along X (azimuth 0/180), so its narrowest
 # half-width (11.5 mm) faces azimuth 90/270 -- which is where the laser's top
 # exit lands. That orientation is load-bearing; see audit bore-exit checks.
-AZ_LED1, AZ_LED2, AZ_IR = 0.0, 180.0, 90.0
+AZ_LED1, AZ_LED2, AZ_IR = 45.0, 225.0, 135.0
 AZ_LASER = 270.0
-AZ_CAMERA = 225.0
+AZ_CAMERA = 0.0
 
 # Camera tilt follows from CAMERA_SLANT and the lateral offset that keeps the
 # sensor clear of the aperture tower. Upstream draws the camera vertical, but
@@ -201,6 +201,11 @@ LASER_BODY_D, LASER_BODY_L = 6.0, 10.0       # brass barrel, VERIFY
 
 # --- discretes --------------------------------------------------------------
 LED_BODY_D = 5.0
+# [ASSUMED] Body length behind the dome of a 5 mm through-hole LED. This is
+# the number FINDINGS.md section 1 turns on -- but the conclusion survives any
+# real LED: the longest body that clears an AS7341 board at a 9 mm standoff is
+# 0.73 mm, so even a 3 mm LED breaks it.
+LED_BODY_L = 8.6
 SWITCH_L, SWITCH_W, SWITCH_H = 20.0, 6.4, 10.0   # SPDT snap-action, VERIFY
 RING_WINDOW_D, RING_WINDOW_T = 10.0, 0.5          # touch-tier window
 
@@ -230,7 +235,9 @@ LAP_H = 2.0                 # how far it rises past the part line
 LAP_FIT = 0.15              # clearance between the two
 MIN_WALL = 1.0              # audit fails below this
 
-ENV_X, ENV_Y, ENV_Z = 92.0, 128.0, 42.0
+# ENV_Z 44 (was 42): the AS7341 retainer tops out at 39.2 and the ceiling
+# inner face has to clear it by MIN_CLEAR, not by 0.4 mm.
+ENV_X, ENV_Y, ENV_Z = 92.0, 128.0, 44.0
 CORNER_R = 5.0
 # The USB stacks are 16.0 mm tall and sit on a PCB at PI_PCB_Z + PI_PCB_T, so
 # their tops reach 23.8. The part line has to sit ABOVE that or the port window

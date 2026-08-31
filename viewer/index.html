@@ -65,6 +65,13 @@
     <div id="stats"></div>
 
     <hr>
+    <div class="lbl">Placement</div>
+    <div id="seats"></div>
+
+    <div class="lbl">Tightest clearances</div>
+    <div id="gaps"></div>
+
+    <hr>
     <div class="lbl">Optics</div>
     <div id="optics"></div>
 
@@ -208,6 +215,39 @@ async function load(entry){
   fitView();
 }
 
+const SHORT = s => s.replace(/^mock_/,'').replace(/_/g,' ');
+
+function placementPanel(){
+  // where each bought component actually sits, measured off the real mesh
+  const keep = ['led1-on-axis','led2-on-axis','ir-on-axis','laser-on-axis',
+                'camera-on-axis','as7341-on-deck','cartridge-well-on-spot',
+                'pi-on-bosses','oled-under-ceiling'];
+  const lbl = {'led1-on-axis':'white LED 1','led2-on-axis':'white LED 2',
+               'ir-on-axis':'940 nm IR','laser-on-axis':'650 nm laser',
+               'camera-on-axis':'camera (lensless)','as7341-on-deck':'AS7341',
+               'cartridge-well-on-spot':'cartridge well','pi-on-bosses':'Pi 4B',
+               'oled-under-ceiling':'OLED'};
+  const num = {'led1-on-axis':'12.00 mm @ 45°','led2-on-axis':'12.00 mm @ 45°',
+               'ir-on-axis':'12.00 mm @ 45°','laser-on-axis':'22.00 mm @ 30°',
+               'camera-on-axis':'20.00 mm @ 45°','as7341-on-deck':'on the deck',
+               'cartridge-well-on-spot':'on the read spot',
+               'pi-on-bosses':'4 mm bosses','oled-under-ceiling':'1.90 mm clear'};
+  const seats = (man.seats||[]).filter(s => keep.includes(s.name));
+  document.getElementById('seats').innerHTML = seats.map(s =>
+    `<div class="stat"><span>${lbl[s.name]||s.name}</span>` +
+    `<b style="color:${s.status==='PASS'?'var(--ok)':'var(--warn)'}">` +
+    `${num[s.name]||''}</b></div>`).join('');
+
+  // the ten tightest measured pairs, contacts excluded
+  const g = (man.gaps||[]).filter(x => x.kind !== 'contact').slice(0, 10);
+  document.getElementById('gaps').innerHTML = g.map(x =>
+    `<div class="stat"><span>${SHORT(x.a)} ↔ ${SHORT(x.b)}</span>` +
+    `<b style="color:${x.status==='PASS'?'var(--ok)':'var(--warn)'}">` +
+    `${x.mm.toFixed(2)} mm</b></div>`).join('')
+    + `<div class="note">${(man.gaps||[]).length} pairs measured surface-to-surface; `
+    + `contacts excluded from this list.</div>`;
+}
+
 function opticsPanel(){
   const s = man.spec;
   const rows = [
@@ -234,6 +274,7 @@ function opticsPanel(){
     {id:'plate'+p.id, label:p.title, glb:p.glb, plate:true})));
   modelSel.innerHTML = entries.map((e,i)=>`<option value="${i}">${e.label}</option>`).join('');
   modelSel.onchange = () => load(entries[modelSel.value]);
+  placementPanel();
   const a = man.audit || {};
   document.getElementById('badge').textContent =
     `audit: ${(a.checks||0) - (a.failed||0)}/${a.checks||0}`;

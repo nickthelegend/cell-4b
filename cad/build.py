@@ -110,8 +110,23 @@ def main():
         print("\nAUDIT FAILED -- nothing written. Run cad/audit.py for detail.")
         return 1
 
+    # keep the measured placement + clearance numbers so the viewer can show
+    # what was actually verified, rather than asserting it in prose
+    gaps, seats = [], []
+    for st, name, detail in results:
+        if name.startswith("gap/"):
+            pair = name[4:].split("~")
+            kind = ("contact" if "designed contact" in detail
+                    else "slide" if "sliding fit" in detail else "clear")
+            gaps.append({"a": pair[0], "b": pair[1], "kind": kind,
+                         "mm": float(detail.split()[0]), "status": st})
+        elif name.startswith("seat/"):
+            seats.append({"name": name[5:], "detail": detail, "status": st})
+    gaps.sort(key=lambda g: g["mm"])
+
     manifest = {"parts": [], "plates": [], "spec": {}, "mocks": [],
-                "audit": {"checks": len(results), "failed": n_fail}}
+                "audit": {"checks": len(results), "failed": n_fail},
+                "gaps": gaps, "seats": seats}
 
     # ---- STLs, in print orientation -------------------------------------
     print("\nwriting STLs ...")

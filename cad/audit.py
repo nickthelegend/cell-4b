@@ -23,6 +23,7 @@ import numpy as np
 from shapely.geometry import box
 from shapely.ops import unary_union
 
+import clearance as CL
 import partlib as pl
 import parts as P
 import spec as S
@@ -525,6 +526,155 @@ def check_mock_fit(mocks_):
     return ok
 
 
+# --------------------------------------------------------------------------
+# component placement: seating, interference, clearance
+# --------------------------------------------------------------------------
+
+# Pairs that are SUPPOSED to touch. Everything else must keep MIN_CLEAR.
+# Touching is still not allowed to interpenetrate.
+CONTACT = {
+    frozenset(("optical_head", "shell_lower")),      # head sits on 4 posts
+    frozenset(("optical_head", "sensor_deck")),      # deck caps the head
+    frozenset(("optical_head", "aperture_tube")),    # tube in its counterbore
+    frozenset(("optical_head", "mock_leds")),        # LEDs in their bores
+    frozenset(("optical_head", "mock_laser")),       # laser in its bore
+    frozenset(("optical_head", "mock_camera")),      # camera on its bore
+    frozenset(("optical_head", "mock_cartridge")),   # skirt rides over it
+    frozenset(("sensor_deck", "sensor_carrier")),
+    frozenset(("sensor_deck", "mock_as7341")),
+    frozenset(("sensor_carrier", "mock_as7341")),
+    frozenset(("shell_lower", "shell_upper")),       # the lap joint
+    frozenset(("shell_lower", "mock_pi4b")),         # board on its bosses
+    frozenset(("shell_lower", "mock_switch")),
+    frozenset(("shell_lower", "slot_baffle")),
+    frozenset(("shell_lower", "mock_cartridge")),    # rides the slot rails
+    frozenset(("shell_upper", "mock_oled")),         # OLED on its posts
+    frozenset(("shell_upper", "mock_ring_window")),  # window in its seat
+    frozenset(("shell_upper", "oled_bezel")),
+    frozenset(("mock_oled", "oled_bezel")),
+}
+
+# Sliding fits: these are SUPPOSED to be a few tenths apart, because the
+# cartridge has to move through them.
+GUIDE = {
+    frozenset(("mock_cartridge", "slot_baffle")),
+    frozenset(("mock_cartridge", "shell_lower")),
+    frozenset(("mock_cartridge", "optical_head")),
+}
+
+MIN_CLEAR = 0.8          # mm, between anything not meant to touch
+MIN_SLIDE = 0.25         # mm, across a sliding fit
+MAX_PENETRATION = 0.15   # mm, below this it is contact, not a collision
+NOT_PLACED = {"window_jig", "cartridge", "cartridge_reference", "cartridge_null"}
+
+
+def check_seating(mocks_):
+    """Is each component actually AT its designed position? A component can
+    sit inside the case, clear of everything, and still be in the wrong
+    place -- which is the failure a bounding box can never see."""
+    ok = True
+
+    # LED / laser tips must sit at their slant distance on their own axis
+    for nm, slant in (("led1", S.LED_SLANT), ("led2", S.LED_SLANT),
+                      ("ir", S.LED_SLANT), ("laser", S.LASER_SLANT),
+                      ("camera", S.CAMERA_SLANT)):
+        tilt = az = None
+        for n2, _d, t, azm in S.OPTICAL_BORES:
+            if n2 == nm:
+                tilt, az = t, azm
+        x, y = S.polar(slant * math.sin(math.radians(tilt)), az)
+        z = S.Z_SAMPLE + slant * math.cos(math.radians(tilt))
+        d = math.hypot(math.hypot(x - S.RS_X, y - S.RS_Y), z - S.Z_SAMPLE)
+        ok &= _rec(abs(d - slant) < 1e-6, f"seat/{nm}-on-axis",
+                   f"emitter face at ({x:+.2f}, {y:+.2f}, {z:.2f}), "
+                   f"{d:.3f} mm from the read spot on its own axis")
+
+    # AS7341 die must sit over the relief shaft
+    off = math.hypot(*S.AS_CHIP_OFF)
+    ok &= _rec(off + 1.5 <= S.SHAFT_D / 2, "seat/as7341-over-shaft",
+               f"die offset {off:.2f} mm from the board centre vs a "
+               f"Ø{S.SHAFT_D} shaft -- ASSUMED (0,0); confirm on your board")
+    # The mock's lowest point is the sensor PACKAGE, which deliberately hangs
+    # into the relief shaft; the BOARD underside is what sits on the deck.
+    deck_top = S.HEAD_TOP + P.DECK_T
+    board = mocks_["mock_as7341"]
+    lo, hi = board.bbox()
+    ok &= _rec(abs(float(hi[2]) - (deck_top + S.AS_PCB_T)) < 0.01,
+               "seat/as7341-on-deck",
+               f"board {deck_top:.2f}..{float(hi[2]):.2f}, on a deck top of "
+               f"Z={deck_top:.2f}; the die hangs to Z={lo[2]:.2f} in the shaft")
+    ok &= _rec(abs((hi[0] - lo[0]) - S.AS_PCB_L) < 0.01
+               and abs((hi[1] - lo[1]) - S.AS_PCB_W) < 0.01,
+               "seat/as7341-long-axis-x",
+               f"{hi[0]-lo[0]:.1f} along X x {hi[1]-lo[1]:.1f} along Y -- the "
+               f"narrow side must face the laser exit at az 270")
+
+    # cartridge well exactly on the read spot
+    cz = mocks_["mock_cartridge"]
+    lo, hi = cz.bbox()
+    well_y = float(hi[1]) - S.WELL_FROM_TIP
+    ok &= _rec(abs(well_y - S.RS_Y) < 0.01, "seat/cartridge-well-on-spot",
+               f"well centre Y={well_y:.2f}, read spot Y={S.RS_Y:.2f}")
+    ok &= _rec(abs(float(hi[2]) - (S.SLOT_Z0 + S.GRIP_T)) < 0.01,
+               "seat/cartridge-in-slot",
+               f"body sits on the slot floor at Z={S.SLOT_Z0}; sample plane "
+               f"Z={S.Z_SAMPLE}")
+
+    # Pi on its bosses
+    pi = mocks_["mock_pi4b"]
+    lo, hi = pi.bbox()
+    ok &= _rec(abs(float(lo[2]) - (S.PI_PCB_Z - S.PI_SD_H)) < 0.01,
+               "seat/pi-on-bosses",
+               f"PCB underside Z={S.PI_PCB_Z}, on {S.PI_STANDOFF} mm bosses; "
+               f"microSD hangs to Z={lo[2]:.2f}")
+
+    # OLED glass under its window
+    ol = mocks_["mock_oled"]
+    lo, hi = ol.bbox()
+    gap = (S.ENV_Z - S.CEIL) - float(hi[2])
+    ok &= _rec(gap >= 0, "seat/oled-under-ceiling",
+               f"glass top Z={hi[2]:.2f}, ceiling underside "
+               f"Z={S.ENV_Z - S.CEIL:.2f} -- {gap:.2f} mm")
+    return ok
+
+
+def check_interference(meshes, mocks_):
+    """Every pair: must not interpenetrate, and must keep MIN_CLEAR unless
+    the pair is a designed contact."""
+    ok = True
+    allm = dict(P.assembly())
+    allm.update(mocks_)
+    names = sorted(allm)
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            n1, n2 = names[i], names[j]
+            a, b = allm[n1], allm[n2]
+            g = CL.aabb_gap(a, b)
+            if g > 6.0:
+                continue                      # far apart; nothing to say
+            pair = frozenset((n1, n2))
+            contact, guide = pair in CONTACT, pair in GUIDE
+            depth, npts = CL.penetration(a, b, _inside, n=300,
+                                         tol=MAX_PENETRATION)
+            ok &= _rec(depth <= MAX_PENETRATION, f"clash/{n1}~{n2}",
+                       f"{depth:.2f} mm deep at {npts} points"
+                       if depth > MAX_PENETRATION else
+                       ("contact, no penetration" if contact or guide
+                        else "clear"))
+            if depth > MAX_PENETRATION:
+                continue
+            gap = CL.min_gap(a, b, n=500, cutoff=6.0)
+            if contact:
+                _rec(True, f"gap/{n1}~{n2}", f"{gap:.2f} mm -- designed contact")
+            elif guide:
+                ok &= _rec(gap >= MIN_SLIDE, f"gap/{n1}~{n2}",
+                           f"{gap:.2f} mm sliding fit (need >= {MIN_SLIDE})")
+            else:
+                ok &= _rec(gap >= MIN_CLEAR, f"gap/{n1}~{n2}",
+                           f"{gap:.2f} mm (need >= {MIN_CLEAR})")
+    return ok
+
+
 def check_plates(meshes):
     ok = True
     for nm, m in meshes.items():
@@ -606,7 +756,10 @@ def run(meshes=None, sampled=True):
     if sampled and meshes:
         check_envelope(meshes)
         import mocks as _M
-        check_mock_fit({n: fn() for n, (fn, _c, _a) in _M.MOCKS.items()})
+        mk = {n: fn() for n, (fn, _c, _a) in _M.MOCKS.items()}
+        check_mock_fit(mk)
+        check_seating(mk)
+        check_interference(meshes, mk)
         check_plates(meshes)
         check_corridor(meshes)
         check_pi_bay(meshes)

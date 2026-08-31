@@ -97,6 +97,76 @@ the limit is **0.73 mm**, so the contradiction survives any real LED.
 
 ---
 
+## Component placement and clearance
+
+Added after the first pass, because bounding boxes cannot see a collision.
+`cad/clearance.py` measures two things per pair, with different machinery:
+
+- **penetration depth** — a point counts as overlapping only when it is inside
+  the other solid *and* further than 0.15 mm from its surface. Without that
+  tolerance every designed contact reads as a collision: a board on a deck, a
+  shell on a shell, share a face, and half the sampled points on it classify
+  as "inside".
+- **minimum gap** — exact point-to-triangle distance (Ericson §5.1.5), both
+  directions, from a sampled surface point set. Validated against four cases
+  with known answers before it was trusted: 15.000, 2.500, 0.000 and 20.000.
+
+**52 pairs measured surface-to-surface. Every emitter checked on its own axis.**
+
+| Component | Placement | Measured |
+|---|---|---|
+| White LED 1 / 2 | opposed, az 45 / 225 | **12.000 mm @ 45°** from the read spot |
+| 940 nm IR | az 135 | **12.000 mm @ 45°** |
+| 650 nm laser | az 270 | **22.000 mm @ 30°** |
+| Camera, lensless | az 0 | **20.000 mm @ 45°** |
+| AS7341 | on the deck, die into the shaft | board 35.80–37.40, die to 34.80 |
+| Cartridge well | at STOP2 | **on the read spot**, Y = −32.40 |
+| Pi 4B | on four bosses | PCB at Z 6.40, microSD to 4.40 |
+| OLED | under the ceiling | 1.90 mm clear |
+
+Tightest ten, contacts excluded:
+
+| Pair | Gap |
+|---|---|
+| cartridge ↔ slot baffle | 0.30 mm *(sliding fit)* |
+| optical head ↔ slot baffle | 1.00 mm |
+| camera ↔ LEDs | 1.14 mm |
+| laser ↔ sensor deck | 1.19 mm |
+| AS7341 ↔ optical head | 1.72 mm |
+| aperture tube ↔ cartridge | 2.06 mm |
+| aperture tube ↔ LEDs | 2.14 mm |
+| Pi 4B ↔ shell upper | 2.20 mm |
+| AS7341 ↔ laser | 2.27 mm |
+| sensor carrier ↔ shell upper | 2.40 mm |
+
+### What this pass found
+
+Seven more defects, all of which would have printed:
+
+1. **Four Ø2.2 spikes on the underside of the case.** Pi standoff pilot holes
+   added as *solid* prisms below the floor. The case would not sit flat.
+2. **The head's mounting posts drove 0.4 mm into its own skirt** — post OD 6.4
+   at r = 21 reaches r = 22.2 against a skirt starting at 23.0. Moved to r = 19.
+3. **The slot baffle drove into the head skirt.** A baffle tall enough to look
+   right on its own hits the skirt; it now stops 1.0 mm below it.
+4. **The camera board and the laser barrel overlapped** at 45° azimuth
+   separation. Azimuths reallocated: LEDs to 45/135/225, camera to 0.
+5. **The sensor deck's laser cutout was sized off the light bore, not the
+   barrel** — 0.69 mm clearance on a Ø6 barrel. Now sized off the body.
+6. **The AS7341 retainer sat 0.4 mm under the ceiling.** Case raised to 44 mm.
+7. **The microswitch had nowhere to go.** A 20 mm body across X does not fit
+   between the Ø52 head and the wall, and every azimuth clearing the head hit
+   a corner boss. Turned 90° and placed at (34, −44).
+
+Also fixed structurally: several parts were modelled in their own frame rather
+than assembly coordinates, so the checker had been comparing *unplaced* parts.
+`parts.place()` is now the single source of truth for where each one goes, and
+the laser and camera pockets in the head are **derived from** the component
+bodies in `cad/bodies.py` — change a board dimension and the pocket that
+clears it changes with it.
+
+---
+
 ## [U] Blocked on which part you actually bought
 
 **The AS7341 board.** You said the spectral sensor you received is "kinda

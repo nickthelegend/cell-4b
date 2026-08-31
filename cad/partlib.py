@@ -92,7 +92,7 @@ class Bore:
     part has to pass.
     """
 
-    def __init__(self, d, x0, y0, z0, tilt_deg=0.0, az_deg=0.0, seg=48):
+    def __init__(self, d, x0, y0, z0, tilt_deg=0.0, az_deg=0.0, seg=40):
         self.d, self.x0, self.y0, self.z0 = d, x0, y0, z0
         self.tilt = math.radians(tilt_deg)
         self.az = math.radians(az_deg)

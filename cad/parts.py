@@ -11,6 +11,7 @@ import math
 from shapely.geometry import box
 from shapely.ops import unary_union
 
+import bodies as BD
 import partlib as pl
 from partlib import Bore, Mesh, circle, ellipse, layered, prism, rounded_rect
 import spec as S
@@ -141,7 +142,9 @@ def aperture_tube():
 # --------------------------------------------------------------------------
 
 HEAD_SKIRT_Z = S.Z_SAMPLE + 0.20      # skirt reaches to 0.2 above the window
-HEAD_POST_R = 21.0
+# Post OD 6.4 at r=19 reaches r=22.2, inside the skirt's inner
+# radius of 23.0. At r=21 the post drove 0.4 mm into the skirt.
+HEAD_POST_R = 19.0
 HEAD_POST_AZ = [55.0, 125.0, 235.0, 305.0]
 Z_TUBE_TOP = S.Z_SAMPLE + 9.0         # top of the Ø3 x 6 aperture tube
 
@@ -165,17 +168,25 @@ def optical_head():
         at r = 16.2, which clears the AS7341's 11.5 mm half-width at az 270
     """
     b = _bores()
-    disc = circle(S.HEAD_DIA, 160, S.RS_X, S.RS_Y)
+    disc = circle(S.HEAD_DIA, 120, S.RS_X, S.RS_Y)
     tube_clear = circle(APT_BARREL_D + 2 * 0.2, 48, S.RS_X, S.RS_Y)
     tube_cbore = circle(APT_FLANGE_D + 2 * 0.2, 64, S.RS_X, S.RS_Y)
     shaft = circle(S.SHAFT_D, 48, S.RS_X, S.RS_Y)
     mount = unary_union([circle(S.M25_TAP, 24, x, y) for x, y in head_posts_xy()])
     names = ["led1", "led2", "ir", "laser", "camera"]
 
+    pockets = BD.head_pockets()
+
     def profile(z):
         g = disc
         for n in names:
             g = g.difference(b[n].section(z))
+        # drop-in pockets for the laser barrel and the camera board, both of
+        # which are wider than the bore that carries their light. Derived from
+        # bodies.py, so they cannot drift from the parts they clear.
+        for prof, pz0, pz1 in pockets:
+            if pz0 <= z <= pz1:
+                g = g.difference(prof)
         # central column: tube bore, then its flange counterbore, then the
         # relief shaft. The Ø3 x 6 tube stays the limiting aperture.
         if z < Z_TUBE_TOP - APT_FLANGE_T:
@@ -189,10 +200,10 @@ def optical_head():
     m = Mesh()
     # skirt: closes the 0.8 mm gap over the cartridge everywhere except the
     # corridor the cartridge itself sweeps.
-    skirt = disc.difference(circle(S.HEAD_DIA - 6.0, 160, S.RS_X, S.RS_Y)
+    skirt = disc.difference(circle(S.HEAD_DIA - 6.0, 120, S.RS_X, S.RS_Y)
                             ).difference(_cart_channel(pad=0.15))
     m += prism(skirt, HEAD_SKIRT_Z, S.HEAD_Z0)
-    m += layered(profile, S.HEAD_Z0, S.HEAD_TOP, dz=0.3)
+    m += layered(profile, S.HEAD_Z0, S.HEAD_TOP, dz=0.35)
     return m
 
 
@@ -210,7 +221,8 @@ def sensor_deck():
                          for a in HEAD_POST_AZ])
     # the laser is the one bore that exits the top face -- the deck must not
     # cap it. Its exit ellipse at HEAD_TOP, with clearance.
-    b = Bore(S.LASER_BORE + 1.0, 0.0, 0.0, 0.0,
+    # sized off the BARREL, not the light bore, with MIN_CLEAR each side
+    b = Bore(S.LASER_BODY_D + 2 * 1.2, 0.0, 0.0, 0.0,
              tilt_deg=S.LASER_ANGLE, az_deg=S.AZ_LASER)
     laser_exit = b.section(S.HEAD_TOP - S.Z_SAMPLE)
     cut = unary_union([shaft, holes, posts, laser_exit])
@@ -222,11 +234,18 @@ def sensor_deck():
 # --------------------------------------------------------------------------
 
 def slot_baffle():
+    """Light trap behind the front mouth.
+
+    It stops BELOW the optical head's skirt. The skirt closes the chamber from
+    HEAD_SKIRT_Z up; the baffle closes the slot from the floor to just under
+    it. Together they are light-tight, and neither fouls the other -- a baffle
+    tall enough to look sensible on its own drives straight into the skirt.
+    """
     w = S.SLOT_W + 2.0
     outer = box(-w / 2, -1.2, w / 2, 1.2)
     gap = box(-(S.CART_W + 2 * S.FIT) / 2, -2, (S.CART_W + 2 * S.FIT) / 2, 2)
-    m = prism(outer.difference(gap), 0.0, S.SLOT_H + 3.0)
-    return m
+    return prism(outer.difference(gap), 0.0,
+                 HEAD_SKIRT_Z - S.SLOT_Z0 - 1.0)
 
 
 # --------------------------------------------------------------------------
@@ -432,25 +451,25 @@ def oled_bezel():
     holes = unary_union([circle(S.M2_CLEAR, 24,
                                 sx * S.OLED_HOLE_DX / 2, sy * S.OLED_HOLE_DY / 2)
                          for sx in (-1, 1) for sy in (-1, 1)])
-    return prism(frame.difference(ap).difference(holes), 0.0, 2.0)
+    return prism(frame.difference(ap).difference(holes), 0.0, BEZEL_T)
 
 
 # --------------------------------------------------------------------------
 # sensor carrier  --  AS7341 board, seats chip-DOWN (blood) or chip-UP (touch)
 # --------------------------------------------------------------------------
 
+CARRIER_T = 1.8
+
+
 def sensor_carrier():
-    plate = rounded_rect(S.AS_PCB_L + 6.0, S.AS_PCB_W + 6.0, 2.0)
-    ap = circle(S.APERTURE_BORE + 1.0, 48)
+    """Retainer that clamps the AS7341 down onto the sensor deck. It sits ON
+    TOP of the board, so it must be thin enough to stay under the ceiling."""
+    frame = rounded_rect(S.AS_PCB_L + 5.0, S.AS_PCB_W + 5.0, 2.0)
+    window = rounded_rect(S.AS_PCB_L - 6.0, S.AS_PCB_W - 6.0, 1.0)
     holes = unary_union([circle(S.M2_CLEAR, 24,
                                 sx * S.AS_HOLE_DX / 2, sy * S.AS_HOLE_DY / 2)
                          for sx in (-1, 1) for sy in (-1, 1)])
-    m = prism(plate.difference(ap).difference(holes), 0.0, 2.0)
-    # a lip that locates the PCB
-    lip = rounded_rect(S.AS_PCB_L + 6.0, S.AS_PCB_W + 6.0, 2.0).difference(
-        rounded_rect(S.AS_PCB_L + 2 * S.PCB_FIT, S.AS_PCB_W + 2 * S.PCB_FIT, 1.0))
-    m += prism(lip.difference(holes), 2.0, 2.0 + S.AS_PCB_T + 0.4)
-    return m
+    return prism(frame.difference(window).difference(holes), 0.0, CARRIER_T)
 
 
 PARTS = {
@@ -467,3 +486,46 @@ PARTS = {
     "oled_bezel": (oled_bezel, "#2E3238", 1),
     "sensor_carrier": (sensor_carrier, "#2E3238", 1),
 }
+
+
+# --------------------------------------------------------------------------
+# placement
+#
+# Some parts are modelled in their own frame because that is the frame they
+# are DIMENSIONED in (a cartridge is 51 mm from its own tip; an aperture tube
+# is a tube). `place()` is the single source of truth for where each one
+# actually goes, so the clearance audit and the viewer see a real assembly
+# rather than a pile of parts at the origin.
+# --------------------------------------------------------------------------
+
+Z_TUBE_FLANGE_TOP = Z_TUBE_TOP            # 14.4; flange sits in the counterbore
+DECK_T = 2.4
+
+
+def place(name, mesh):
+    m = mesh.copy()
+    if name == "aperture_tube":
+        # modelled flange-down for printing; assembles flange-UP in the head's
+        # counterbore, barrel hanging into the bore below it.
+        m.rotate_x(180.0, about=(0.0, 0.0))
+        return m.translate(S.RS_X, S.RS_Y, Z_TUBE_FLANGE_TOP)
+    if name == "sensor_deck":
+        return m.translate(S.RS_X, S.RS_Y, S.HEAD_TOP)
+    if name == "sensor_carrier":
+        return m.translate(S.RS_X, S.RS_Y, S.HEAD_TOP + DECK_T + S.AS_PCB_T)
+    if name == "oled_bezel":
+        return m.translate(S.OLED_CX, S.OLED_CY, S.ENV_Z - BEZEL_T)
+    if name == "slot_baffle":
+        return m.translate(0.0, -S.ENV_Y / 2 + S.WALL + S.BAFFLE_OFFSET,
+                           S.SLOT_Z0)
+    return m                                   # already in case coordinates
+
+
+# parts that are consumables / tools, not part of the assembled instrument
+LOOSE = {"cartridge", "cartridge_reference", "cartridge_null", "window_jig"}
+
+
+def assembly():
+    """Every printed part of the instrument, placed."""
+    return {n: place(n, fn()) for n, (fn, _c, _q) in PARTS.items()
+            if n not in LOOSE}
