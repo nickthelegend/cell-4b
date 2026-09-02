@@ -25,6 +25,7 @@ from shapely.ops import unary_union
 
 import clearance as CL
 import partlib as pl
+import bodies as BD
 import parts as P
 import spec as S
 
@@ -364,6 +365,64 @@ def check_light_tight():
                f"{P.HEAD_SKIRT_Z - S.Z_SAMPLE:.2f} mm over the window")
     ok &= _rec(S.BAFFLE_OFFSET > 0, "light/slot-baffle",
                f"baffle {S.BAFFLE_OFFSET} mm behind the slot mouth")
+    return ok
+
+
+# how much daylight the slot may show past the baffle, outside the cartridge
+# channel. Both real gaps are exactly one printed fit wide -- one beside the
+# switch, one beside the az-305 lug boss -- so the budget is two of them plus
+# a little. It is a REGRESSION bound, not a target.
+SLOT_GAP_EACH = 0.5
+SLOT_GAP_TOTAL = 1.2
+
+
+def check_slot_light(mocks_):
+    """Measure what the slot actually leaves open, rather than assuming.
+
+    `light/slot-baffle` above only asserts the baffle is offset from the
+    mouth, which says nothing about whether it blocks anything -- and it
+    happily passed while a lug boss punched a hole through the baffle. This
+    walks the slot at the baffle plane and measures the open width.
+
+    The cartridge channel itself is excluded: it is deliberately open, and the
+    cartridge fills it. A screw fills each boss's axial hole, so the boss
+    counts as solid to its full OD.
+    """
+    hw = (S.CART_W + 2 * S.FIT) / 2
+    y = -S.ENV_Y / 2 + S.WALL + S.BAFFLE_OFFSET
+    allm = P.assembly()
+    solids = [allm["slot_baffle"], allm["shell_lower"], mocks_["mock_switch"]]
+    lugs = P.head_lugs_xy()
+    zs = np.linspace(S.SLOT_Z0 + 0.12, S.SLOT_Z0 + S.CART_T - 0.12, 3)
+    step, jit = 0.2, 0.037        # jitter off every face plane
+    gaps, run = [], None
+    x = -S.SLOT_W / 2 + jit
+    while x <= S.SLOT_W / 2:
+        open_here = False
+        if abs(x) > hw:
+            pts = np.array([(x, y, z) for z in zs])
+            in_boss = any(math.hypot(x - lx, y - ly) <= S.BOSS_OD / 2
+                          for lx, ly in lugs)
+            open_here = not (in_boss or any(_inside(m, pts).any()
+                                            for m in solids))
+        if open_here:
+            run = [x, x] if run is None else [run[0], x]
+        elif run:
+            gaps.append(tuple(run))
+            run = None
+        x += step
+    if run:
+        gaps.append(tuple(run))
+
+    widths = [b - a + step for a, b in gaps]
+    total = sum(widths)
+    worst = max(widths) if widths else 0.0
+    where = ", ".join(f"x {a:+.1f}..{b:+.1f}" for a, b in gaps) or "none"
+    ok = _rec(worst <= SLOT_GAP_EACH, "light/slot-gap-each",
+              f"widest opening {worst:.2f} mm (budget {SLOT_GAP_EACH}); {where}")
+    ok &= _rec(total <= SLOT_GAP_TOTAL, "light/slot-gap-total",
+               f"{total:.2f} mm of daylight past the baffle in {len(gaps)} "
+               f"gap(s), budget {SLOT_GAP_TOTAL}")
     return ok
 
 
@@ -777,13 +836,21 @@ def check_function(mocks_):
     # 1. the cartridge switch must be actuated BY the cartridge
     lo, hi = mocks_["mock_switch"].bbox()
     # the mock shows the lever DEPRESSED at the channel wall; free travel is
-    # what the cartridge actually pushes against
-    free_x = float(lo[0]) - S.SWITCH_FREE_TRAVEL
-    reaches = free_x < hw and float(hi[0]) > -hw
+    # what the cartridge actually pushes against.
+    #
+    # Which END of the bbox is the lever depends on which side of the slot the
+    # switch sits on, and the free travel carries it TOWARD x=0 either way.
+    # Hard-coding the +X case silently inverted both when the switch moved.
+    import mocks_geom as _MG
+    side = _MG.SWITCH_SIDE
+    tip = float(lo[0]) if side > 0 else float(hi[0])
+    far = float(hi[0]) if side > 0 else float(lo[0])
+    free_x = tip - side * S.SWITCH_FREE_TRAVEL
+    reaches = side * free_x < hw and side * far > hw
     in_y = float(lo[1]) < -S.ENV_Y / 2 + S.STOP2 and float(hi[1]) > -S.ENV_Y / 2
     in_z = float(lo[2]) < S.SLOT_Z0 + S.CART_T and float(hi[2]) > S.SLOT_Z0
     ok &= _rec(reaches and in_y and in_z, "function/switch-senses-cartridge",
-               f"lever rests at X={lo[0]:.2f}, springs in to {free_x:.2f}; "
+               f"lever rests at X={tip:.2f}, springs in to {free_x:.2f}; "
                f"cartridge edge is at {S.CART_W / 2:.2f}, so it gets pressed. "
                f"Z {lo[2]:.1f}..{hi[2]:.1f} vs a cartridge at "
                f"Z {S.SLOT_Z0}..{S.SLOT_Z0 + S.CART_T}")
@@ -851,6 +918,98 @@ def check_docs():
         ok &= _rec(f"azimuth **{az:.0f}\u00b0**" in txt,
                    f"docs/{label.lower()}-azimuth",
                    f"ASSEMBLY.md must say azimuth **{az:.0f}\u00b0** for the {label}")
+
+    # the head diameter, spelled out in prose next to the camera
+    ok &= _rec(f"\u00d8{S.HEAD_DIA:.0f} head" in txt, "docs/head-diameter",
+               f"ASSEMBLY.md must say \u00d8{S.HEAD_DIA:.0f} head")
+
+    # the fastening: count, and every lug azimuth
+    import mocks_geom as _MG
+    n = len(P.HEAD_LUG_AZ)
+    word = {3: "three", 4: "four"}.get(n, str(n))
+    ok &= _rec(f"**{word} lugs**" in txt, "docs/lug-count",
+               f"ASSEMBLY.md must say **{word} lugs** ({n} in parts.py)")
+    for az in P.HEAD_LUG_AZ:
+        ok &= _rec(f"**{az:.0f}\u00b0**" in txt, f"docs/lug-{az:.0f}-azimuth",
+                   f"ASSEMBLY.md must list the {az:.0f}\u00b0 lug")
+
+    # which side of the slot the switch is on
+    side = "\u2212X" if _MG.SWITCH_SIDE < 0 else "+X"
+    ok &= _rec(f"**{side}** side of the slot" in txt, "docs/switch-side",
+               f"ASSEMBLY.md must say the microswitch is on the {side} side")
+    return ok
+
+
+def check_connected(meshes):
+    """Every printed part must come out as ONE connected shell.
+
+    A part that falls apart into loose pieces is still watertight and still
+    manifold, piece by piece, so `validate()` accepts it without complaint.
+    That is exactly how the head's lugs shipped as floating cylinders and the
+    sensor deck as four separate pieces: a Ø9 pad at r=28 does not reach a Ø44
+    body at r=22, and nothing was looking.
+    """
+    ok = True
+    for nm, m in sorted(meshes.items()):
+        V, F = m._np()
+        # union-find over vertices welded by position, joined through faces
+        key = {}
+        rep = list(range(len(V)))
+
+        def find(i):
+            while rep[i] != i:
+                rep[i] = rep[rep[i]]
+                i = rep[i]
+            return i
+
+        def union(a, b):
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                rep[rb] = ra
+
+        for i, v in enumerate(V):
+            k = (round(float(v[0]), 5), round(float(v[1]), 5), round(float(v[2]), 5))
+            if k in key:
+                union(key[k], i)
+            else:
+                key[k] = i
+        for f in F:
+            union(int(f[0]), int(f[1]))
+            union(int(f[1]), int(f[2]))
+        # Shells welded by vertex are one piece for free. But `layered()`
+        # builds a part as a STACK of overlapping prisms that share no
+        # vertices at all -- they fuse in the slicer, by interpenetrating.
+        # So merge any two components whose boxes actually overlap; only
+        # components that touch nothing are genuinely loose.
+        comp = {}
+        for i in range(len(V)):
+            comp.setdefault(find(i), []).append(i)
+        boxes = []
+        for idxs in comp.values():
+            pts = V[idxs]
+            boxes.append([pts.min(axis=0), pts.max(axis=0)])
+        EPS = 1e-6
+        parent = list(range(len(boxes)))
+
+        def f2(i):
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+
+        for i in range(len(boxes)):
+            for j in range(i + 1, len(boxes)):
+                lo_i, hi_i = boxes[i]
+                lo_j, hi_j = boxes[j]
+                if all(hi_i[k] >= lo_j[k] - EPS and hi_j[k] >= lo_i[k] - EPS
+                       for k in range(3)):
+                    a, b = f2(i), f2(j)
+                    if a != b:
+                        parent[b] = a
+        n = len({f2(i) for i in range(len(boxes))})
+        ok &= _rec(n == 1, f"connected/{nm}",
+                   f"{len(boxes)} shell(s) fusing into {n} solid piece(s)"
+                   + ("" if n == 1 else " -- this part falls apart"))
     return ok
 
 
@@ -903,16 +1062,120 @@ def check_bosses_clear_pi():
     return ok
 
 
-def check_head_posts():
-    """Head mounting posts must miss the cartridge corridor."""
+def _bore_dir(tilt, az):
+    t, a = math.radians(tilt), math.radians(az)
+    return (math.sin(t) * math.cos(a), math.sin(t) * math.sin(a), math.cos(t))
+
+
+def _swept_bodies():
+    """Every emitter/detector swept along its own insertion axis.
+
+    A lug can be clear of a part in its SEATED position and still make that
+    part impossible to fit, because the part has to travel down its bore from
+    outside. Checking the seated body alone is what let the old posts pass.
+    """
+    from shapely import affinity
+    out = []
+    for nm, mesh, tilt, az in (
+            ("led1", BD.led_body("led1"), S.LED_ANGLE, S.AZ_LED1),
+            ("led2", BD.led_body("led2"), S.LED_ANGLE, S.AZ_LED2),
+            ("ir", BD.led_body("ir"), S.LED_ANGLE, S.AZ_IR),
+            ("laser", BD.laser_body(), S.LASER_ANGLE, S.AZ_LASER),
+            ("camera", BD.camera_body(), S.CAMERA_ANGLE, S.AZ_CAMERA)):
+        env, (z0, z1) = BD.xy_envelope(mesh, 0.0), BD.z_range(mesh)
+        dx, dy, dz = _bore_dir(tilt, az)
+        t = 0.0
+        while t <= 55.0:
+            out.append((nm, affinity.translate(env, dx * t, dy * t),
+                        z0 + dz * t, z1 + dz * t))
+            t += 1.0
+    return out
+
+
+def check_head_lugs():
+    """The three head lugs, against everything they could possibly foul.
+
+    See FINDINGS.md section 9. The predecessor of this check tested only the
+    cartridge corridor and the head radius, and four posts passed it while two
+    of them opened into the camera pocket and all four left 0.08 mm of wall to
+    an LED bore. Fitting is not the same as clearing.
+    """
+    from shapely.geometry import Point
     ok = True
     hw = (S.CART_W + 2 * S.FIT) / 2
-    for i, (x, y) in enumerate(P.head_posts_xy()):
-        ok &= _rec(abs(x) > hw + 3.2, f"head-post/{i}-clear-of-corridor",
-                   f"post at X={x:+.2f}, corridor half-width {hw:.2f}")
+    lug_r = P.LUG_PAD_D / 2
+    cart = P._cart_channel(pad=0.15)
+    inner_x, inner_y = S.ENV_X / 2 - S.WALL, S.ENV_Y / 2 - S.WALL
+    swept = _swept_bodies()
+    z_lo, z_hi = S.FLOOR, S.HEAD_TOP + P.DECK_T
+
+    for i, (x, y) in enumerate(P.head_lugs_xy()):
+        p = Point(x, y)
         r = math.hypot(x - S.RS_X, y - S.RS_Y)
-        ok &= _rec(r < S.HEAD_DIA / 2 - 1.0, f"head-post/{i}-under-head",
+        ok &= _rec(r > S.HEAD_DIA / 2, f"lug/{i}-outside-optics",
                    f"r={r:.1f} vs head radius {S.HEAD_DIA / 2:.1f}")
+        ok &= _rec(p.distance(cart) > lug_r + 1.0, f"lug/{i}-clear-of-corridor",
+                   f"{p.distance(cart):.2f} mm to the cartridge corridor")
+        ok &= _rec(abs(x) + lug_r < inner_x - 1.0 and
+                   abs(y) + lug_r < inner_y - 1.0, f"lug/{i}-inside-walls",
+                   f"({x:+.1f},{y:+.1f}) vs inner {inner_x:.1f} x {inner_y:.1f}")
+        worst, who = 9e9, ""
+        for nm, g, bz0, bz1 in swept:
+            if bz1 < z_lo or bz0 > z_hi:
+                continue
+            d = p.distance(g)
+            if d < worst:
+                worst, who = d, nm
+        ok &= _rec(worst > lug_r + 1.0, f"lug/{i}-clear-of-insertion",
+                   f"{worst:.2f} mm to the {who} insertion corridor "
+                   f"(need > {lug_r + 1.0:.2f})")
+    return ok
+
+
+# every hole cut in a part, so no two of them can silently merge ------------
+# (part, label, x, y, diameter). unary_union merges overlapping cuts without
+# complaint and the mesh stays watertight, so nothing downstream notices.
+def _part_holes():
+    deck = [("AS7341 M2", sx * S.AS_HOLE_DX / 2, sy * S.AS_HOLE_DY / 2,
+             S.M2_CLEAR) for sx in (-1, 1) for sy in (-1, 1)]
+    deck += [("lug M2.5", x - S.RS_X, y - S.RS_Y, S.M25_CLEAR)
+             for x, y in P.head_lugs_xy()]
+    carrier = [("AS7341 M2", sx * S.AS_HOLE_DX / 2, sy * S.AS_HOLE_DY / 2,
+                S.M2_CLEAR) for sx in (-1, 1) for sy in (-1, 1)]
+    return {"sensor_deck": deck, "sensor_carrier": carrier}
+
+
+def check_fasteners():
+    """No two holes in one part may merge, and no screw head may sit under a
+    part stacked on top of it.
+
+    Both of these were live defects: the AS7341's four M2 holes merged with the
+    four M2.5 post holes (centres 1.52 mm, radii summing to 2.55), and all four
+    M2.5 heads sat under the board, so it could not lie flat on the deck.
+    """
+    ok = True
+    WEB = 1.0
+    for part, holes in _part_holes().items():
+        for i in range(len(holes)):
+            for j in range(i + 1, len(holes)):
+                n1, x1, y1, d1 = holes[i]
+                n2, x2, y2, d2 = holes[j]
+                d = math.hypot(x1 - x2, y1 - y2)
+                need = d1 / 2 + d2 / 2 + WEB
+                ok &= _rec(d >= need, f"hole-web/{part}/{n1}~{n2}",
+                           f"centres {d:.2f} mm, need {need:.2f} "
+                           f"({n1} + {n2} + {WEB:.1f} web)")
+
+    # screw heads on the deck's top face vs what lands on that face
+    stacked = [("AS7341 board", S.AS_PCB_L, S.AS_PCB_W),
+               ("flip-mount carrier", S.AS_PCB_L + 5.0, S.AS_PCB_W + 5.0)]
+    for x, y in P.head_lugs_xy():
+        lx, ly = x - S.RS_X, y - S.RS_Y
+        for nm, L, W in stacked:
+            clear = abs(lx) > L / 2 + S.M25_HEAD / 2 or \
+                abs(ly) > W / 2 + S.M25_HEAD / 2
+            ok &= _rec(clear, f"screw-head/{nm}/az{math.degrees(math.atan2(ly, lx)) % 360:.0f}",
+                       f"head at ({lx:+.1f},{ly:+.1f}) vs {L:.1f} x {W:.1f} footprint")
     return ok
 
 
@@ -927,7 +1190,8 @@ def run(meshes=None, sampled=True):
     check_pi_mounting()
     check_port_windows()
     check_bosses_clear_pi()
-    check_head_posts()
+    check_head_lugs()
+    check_fasteners()
     check_oled()
     check_ring_geometry()
     check_light_tight()
@@ -941,7 +1205,9 @@ def run(meshes=None, sampled=True):
         check_cable_route(meshes, mk)
         check_docs()
         check_function(mk)
+        check_slot_light(mk)
         check_interference(meshes, mk)
+        check_connected(meshes)
         check_plates(meshes)
         check_corridor(meshes)
         check_pi_bay(meshes)

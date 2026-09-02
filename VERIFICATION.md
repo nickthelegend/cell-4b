@@ -198,6 +198,42 @@ Seven more defects, all of which would have printed:
    between the Ø52 head and the wall, and every azimuth clearing the head hit
    a corner boss. Turned 90° and placed at (34, −44).
 
+### A later pass found five more, in the fastening
+
+Everything above was about parts fitting. These are about a screw having
+somewhere to go, and they survived 346 passing checks. Full account in
+`FINDINGS.md` §9.
+
+8. **Two head posts opened into the camera pocket** — distance 0.00 mm. The
+   tap hole ran straight into the camera cavity.
+9. **All four head posts left 0.08 mm of wall to an LED bore**, where
+   `MIN_WALL` is 1.0. The azimuths 30/150/210/330 sit exactly 15° off the bore
+   azimuths 45/135/225, which at r = 15 is 3.9 mm of arc.
+10. **The AS7341's four M2 holes merged with the four post M2.5 holes** in the
+    sensor deck — centres 1.52 mm apart, radii summing to 2.55. They fused
+    into figure-8 slots, so there was no hole to screw the board down with.
+    `unary_union` merges overlapping cuts silently and the mesh stayed
+    watertight, so nothing downstream noticed.
+11. **All four M2.5 screw heads sat under the AS7341 board**, which therefore
+    could not lie flat on the deck.
+12. **The lugs that replaced them printed as loose pieces.** A Ø9 pad at
+    r = 28 never reaches a Ø44 body at r = 22, so `sensor_deck` came out as
+    four separate solids and the head's lugs as floating cylinders — each
+    independently manifold, so `validate()` accepted it. They are webbed back
+    to the body now.
+
+Four interior post positions are not merely awkward but **impossible**: a
+0.1 mm grid search of the whole head interior finds *zero* feasible cells in
+the +x/+y quadrant at any radius or azimuth. The fastening moved outside the
+optical body: three lugs at r = 28, azimuths 115/180/305.
+
+New checks, which produce **20 failures** against the old geometry and none
+against the current: `check_head_lugs()` (fasteners vs bores, pockets and
+*insertion corridors*), `check_fasteners()` (holes merging, screw heads under
+stacked parts), `check_connected()` (a part that falls apart), and
+`check_slot_light()` (measures daylight past the baffle instead of asserting
+the offset is positive).
+
 Also fixed structurally: several parts were modelled in their own frame rather
 than assembly coordinates, so the checker had been comparing *unplaced* parts.
 `parts.place()` is now the single source of truth for where each one goes, and

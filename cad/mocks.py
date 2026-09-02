@@ -191,8 +191,11 @@ def switch():
     # SWITCH_FREE_TRAVEL further in; that is what actually gets pressed, and
     # audit.check_function() asserts it.
     hw = (S.CART_W + 2 * S.FIT) / 2
-    lev = box(hw, SWITCH_CY - 1.0, MG.SWITCH_CX - S.SWITCH_L / 2,
-              SWITCH_CY + 1.0)
+    # from the channel wall on the switch's side, out to the body's inner face
+    x_chan = MG.SWITCH_SIDE * hw
+    x_body = MG.SWITCH_CX - MG.SWITCH_SIDE * S.SWITCH_L / 2
+    lev = box(min(x_chan, x_body), SWITCH_CY - 1.0,
+              max(x_chan, x_body), SWITCH_CY + 1.0)
     m += prism(lev, S.SLOT_Z0 + 0.4, S.SLOT_Z0 + 1.8)
     return m
 

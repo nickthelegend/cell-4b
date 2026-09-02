@@ -75,15 +75,15 @@ def main():
         bore_dir(S.CAMERA_ANGLE, S.AZ_CAMERA), 52, 6,
         "OV5647 camera", "45 deg, 20.00 mm, lens removed")
     add("optical_head", placed["optical_head"], "#2E3238", UP, 60, 7,
-        "Optical head", "down onto its four posts")
+        "Optical head", "down onto its three lugs -- 115, 180, 305 deg")
     add("mock_csi_ribbon", M.csi_ribbon(), "#C8A24A", UP, 34, 8,
         "CSI ribbon", "110 mm: out +X, on edge, over the header")
     add("aperture_tube", placed["aperture_tube"], "#2E3238", UP, 30, 9,
         "Aperture tube", "flange up -- this fixes the 3 mm spot")
     add("sensor_deck", placed["sensor_deck"], "#2E3238", UP, 34, 10,
-        "Sensor deck", "caps the head, four M2.5")
+        "Sensor deck", "three ears, one M2.5 each -- none through the middle")
     add("mock_as7341", M.as7341(), "#2B6CB0", UP, 30, 11,
-        "AS7341", "chip DOWN reads the cartridge")
+        "AS7341", "4 x M2 at 25.5 x 18.0 -- flat deck, no screw heads")
     add("sensor_carrier", placed["sensor_carrier"], "#2E3238", UP, 26, 12,
         "Flip-mount carrier", "symmetric -- clamps the board either way up")
     add("touch_collar", placed["touch_collar"], "#3A4048", UP, 30, 13,

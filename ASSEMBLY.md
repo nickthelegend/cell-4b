@@ -94,7 +94,7 @@ Fit everything into the head **before** it goes into the shell, and before
    pocket cut for it — lower it straight down before the deck goes on.
 4. **Route the CSI ribbon before the deck goes on.** This is the step that is
    easy to leave until too late. The camera sits at r = 14.1 mm from the read
-   spot — **inside** the Ø52 head — so 96% of it is buried and its ribbon
+   spot — **inside** the Ø44 head — so 96% of it is buried and its ribbon
    starts in a blind pocket. It leaves through the head's +X side wall, turns
    **on edge** to drop down the channel between the head and the case wall,
    crosses the 12 mm gap between the head and the Pi still on edge, then lies
@@ -103,13 +103,36 @@ Fit everything into the head **before** it goes into the shell, and before
    not reach. `cad/spec.py: CABLE_ROUTE` has the waypoints and
    `audit.check_cable_route()` verifies the whole corridor is clear.
 5. **`aperture_tube`**, flange up, into the central counterbore.
-6. **`sensor_deck`** on top, four M2.5 into the head posts.
+6. **`sensor_deck`** on top. Its three **ears** line up with the head's three
+   lugs — see below. Nothing screws down through the middle of the deck, so
+   the AS7341 lands on a flat face.
 7. **AS7341** on `sensor_carrier`, chip **DOWN** over the relief shaft, then
    onto the deck. **Long axis along X.**
 
-Then drop the head onto the four posts in `shell_lower` and screw down. Its
-skirt closes to 0.2 mm above the cartridge, everywhere except the corridor the
-cartridge itself sweeps.
+Then drop the head onto the **three lugs** in `shell_lower` and screw down.
+Its skirt closes to 0.2 mm above the cartridge, everywhere except the corridor
+the cartridge itself sweeps.
+
+**Three lugs, not four, and they are outside the head — not through it.** The
+fastening used to run through the optical body and could not be built: two of
+the four posts opened straight into the camera pocket, and all four left
+0.08 mm of wall to an LED bore where the minimum is 1.0. Four interior
+positions are impossible at any radius, because the camera pocket and the 45°
+LED bore between them own that whole quadrant. So the screws moved out:
+
+| Lug | Azimuth | Clearance to the nearest thing |
+|---|---|---|
+| 1 | **115°** | 2.5 mm (the CSI ribbon owns +Y, which is why not 90°) |
+| 2 | **180°** | 12.8 mm |
+| 3 | **305°** | 5.9 mm (only free because the switch moved to −X) |
+
+One M2.5 per lug runs **deck ear → head lug → shell boss**, so a single screw
+column clamps the whole stack and never crosses a bore. Three is also the right
+number: it cannot rock, and the read spot sits inside the triangle they form.
+See `FINDINGS.md` §9.
+
+The microswitch sits on the **−X** side of the slot. It moved there to free
+the 305° lug; the cartridge channel is symmetric, so nothing else changed.
 
 **Wire the laser interlock in hardware.** The cartridge microswitch contacts go
 **in series with the laser module's supply**, not in the GPIO6 gate line. An

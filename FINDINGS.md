@@ -205,9 +205,9 @@ strip opens to **7.2 mm**, which takes a subminiature switch body with its
 lever in the channel.
 
 Two knock-on fixes fell out of it: the head's mounting posts moved to r = 15 at
-30° off the X axis (at r = 19 they fouled the smaller skirt, and at the old
-azimuths they fouled the cartridge channel), and the slot baffle gained a notch
-for the switch body, which then fills the notch and keeps it light-tight.
+30° off the X axis, and the slot baffle gained a notch for the switch body,
+which then fills the notch and keeps it light-tight. **The post move was
+wrong** — §9 is what it cost and how it was found.
 
 ## 8. Upstream's touch tier has no drawn optical path — and the fix is a flip
 
@@ -283,6 +283,88 @@ real property of the specified optics and not an artefact of how I built it.
 
 **Cost:** the case grows to 59.8 mm tall, because the finger has to sit 19 mm
 above a sensor that is itself 35.8 mm up.
+
+## 9. My own r = 15 head posts were unbuildable — and 4 of them are impossible
+
+This one is mine, not upstream's. §7 moved the head's mounting posts to r = 15
+at azimuths 30/150/210/330 and the audit passed 346 checks. It was wrong in
+three separate ways at once, and every check was blind to all three.
+
+### What was actually wrong
+
+| | |
+|---|---|
+| Posts az 30 and az 330 | **inside the camera pocket** — distance 0.00 mm. The tap hole opened straight into the camera cavity. |
+| All four posts | **0.08 mm of wall** to an LED/IR bore at z ≈ 19.95, where `MIN_WALL` is 1.0. |
+| Deck: AS7341 M2 × 4 vs post M2.5 × 4 | centres **1.52 mm** apart, radii summing to 2.55 — the holes **merged** into figure-8 slots. |
+| Deck: all four M2.5 heads | sat **under the AS7341 board**, so it could not lie flat. |
+
+The azimuths were the root: 30/150/210/330 is exactly 15° off the bore
+azimuths 45/135/225, and 15° at r = 15 is 3.9 mm of arc. The AS7341's own hole
+pattern lands at atan2(9, 12.75) = 35.2°, so the two four-hole patterns were
+placed on the same diagonals by two different pieces of reasoning.
+
+### Why nothing caught it
+
+* `check_bore_separation()` compares **bores to bores**, never a fastener to a bore.
+* `check_head_posts()` tested only the cartridge corridor and the head radius.
+* `unary_union` merges overlapping cuts **silently**. The mesh stayed
+  watertight and manifold, so `validate()` was satisfied.
+* Screws are not modelled, so nothing knew a screw head lands on the deck face
+  the board sits on.
+
+This is the same lesson as `check_function()`: **fitting is not working**, and
+a check that only asks "does it fit" cannot see a screw that has nowhere to go.
+
+### Four interior posts are impossible, not merely awkward
+
+Searching the head's whole interior on a 0.1 mm grid against the real bore
+sections and pockets: the **+x/+y quadrant contains zero feasible cells** at
+any radius and azimuth. The camera pocket (x 5.4…28.7, y ±12.8) and the 45°
+LED bore between them own that sector. With raised screw heads there is no
+feasible position **anywhere**, because the head must also clear the board.
+
+So the fastening left the optical volume. Outside the head there are 31,822
+feasible cells with 16–23 mm of clearance, versus 0.08 mm inside it.
+
+### The fix: three lugs, outside
+
+| Lug | Azimuth | Clearance | Note |
+|---|---|---|---|
+| 1 | 115° | 2.5 mm | the CSI ribbon owns +Y, so not 90° |
+| 2 | 180° | 12.8 mm | |
+| 3 | 305° | 5.9 mm | needs the switch on −X |
+
+r = 28, Ø9 pads. One M2.5 per lug runs deck ear → head lug → shell boss. Three
+because those are the only zones that exist — and three is correct anyway: it
+cannot rock, and the read spot sits inside the triangle. The screws are now
+14 mm clear of the AS7341's board, so its four M2 holes are plain, separate,
+reachable holes.
+
+Two knock-ons of my own: the **microswitch moved to −X** (the channel is
+symmetric, so it is a sign flip), and the **slot baffle gained a second notch**
+for the 305° boss — the same treatment the switch notch already had.
+
+### What now guards it
+
+| Check | Catches |
+|---|---|
+| `check_head_lugs()` | a fastener inside a bore, a pocket, or an **insertion corridor** — the swept path a part travels down, not just where it ends up |
+| `check_fasteners()` | two holes in one part merging; a screw head under a part stacked above it |
+| `check_slot_light()` | **measures** the daylight past the baffle instead of asserting the offset is positive |
+| `check_docs()` | lug count, every lug azimuth, the switch side, the head diameter |
+
+Run against the old geometry these produce **20 failures**. Against the current
+geometry, none. A check that cannot fail is not a check, so that asymmetry is
+the point.
+
+### The residual, stated plainly
+
+`check_slot_light()` measures **0.80 mm** of daylight past the baffle, in two
+gaps of one printed fit each: one beside the switch body, one beside the 305°
+boss. Both are filled by the part that sits in them, but neither is sealed.
+The chamber's real seal is the head skirt, checked separately. The budget is a
+regression bound, not a target.
 
 ## Not changed
 

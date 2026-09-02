@@ -142,21 +142,70 @@ def aperture_tube():
 # --------------------------------------------------------------------------
 
 HEAD_SKIRT_Z = S.Z_SAMPLE + 0.20      # skirt reaches to 0.2 above the window
-# Posts must clear TWO things: the skirt (inner radius (HEAD_DIA-6)/2 = 19.0)
-# and the cartridge channel. OD 6.4 at r=15 reaches r=18.2, inside the skirt;
-# azimuths at 30 deg off the X axis put them at |x| = 13.0, clear of the
-# 7.3 mm channel plus a post radius.
-HEAD_POST_R = 15.0
-HEAD_POST_AZ = [30.0, 150.0, 210.0, 330.0]
+# --------------------------------------------------------------------------
+# head fastening  --  OUTSIDE the optical body, see FINDINGS.md section 9
+#
+# These used to be four posts at r=15 INSIDE the head, and that could not be
+# built. Four interior positions are provably impossible: the +x/+y quadrant
+# is empty at every radius and azimuth, because the camera pocket and the 45
+# deg LED bore between them own that sector. The old positions left 0.08 mm of
+# wall to an LED bore (MIN_WALL is 1.0) and two of them opened straight into
+# the camera pocket.
+#
+# So the fastening leaves the optical volume entirely. Three lugs on the
+# OUTSIDE of the head, at the only three azimuth zones that clear every bore,
+# every component body, every insertion corridor, the cartridge and the walls:
+#
+#     az 115  edge clearance  2.5 mm      az 180  12.8 mm      az 305  5.9 mm
+#
+# az 305 only exists because the microswitch moved to -X; the CSI ribbon owns
+# the +Y annulus, which is why 115 rather than 90.
+#
+# Three, not four, because those are the only zones that exist -- and three is
+# the right number anyway: it cannot rock, and the read spot sits inside the
+# triangle they form. One M2.5 per lug runs deck ear -> head lug -> shell boss,
+# so a single screw column clamps the whole stack and never crosses a bore.
+HEAD_LUG_R = 28.0
+HEAD_LUG_AZ = [115.0, 180.0, 305.0]
+LUG_PAD_D = 9.0
 Z_TUBE_TOP = S.Z_SAMPLE + 9.0         # top of the Ø3 x 6 aperture tube
 
 
-def head_posts_xy():
-    return [S.polar(HEAD_POST_R, a) for a in HEAD_POST_AZ]
+def head_lugs_xy():
+    return [S.polar(HEAD_LUG_R, a) for a in HEAD_LUG_AZ]
+
+
+LUG_WEB_D = 7.0          # width of the web tying each lug back to the body
+
+
+def _lug_pads(cx=S.RS_X, cy=S.RS_Y):
+    """The three lug pads, each WEBBED back to the body, about (cx, cy).
+
+    The web is not decoration. A bare Ø9 pad at r=28 spans r 23.5..32.5 and
+    never reaches the Ø44 body at r=22, so the deck printed as four loose
+    pieces and the head's lugs were floating cylinders -- and `validate()` was
+    satisfied, because each piece is independently manifold. See
+    audit.check_connected().
+    """
+    out = []
+    for az in HEAD_LUG_AZ:
+        px, py = S.polar(HEAD_LUG_R, az)
+        # anchor the web INSIDE the body wall so it fuses rather than touches
+        ax, ay = S.polar(S.HEAD_DIA / 2 - 2.0, az)
+        pad = circle(LUG_PAD_D, 40, cx + px - S.RS_X, cy + py - S.RS_Y)
+        anch = circle(LUG_WEB_D, 24, cx + ax - S.RS_X, cy + ay - S.RS_Y)
+        out.append(pad.union(unary_union([pad, anch]).convex_hull))
+    return unary_union(out)
+
+
+def _lug_holes(cx=S.RS_X, cy=S.RS_Y, d=None):
+    d = S.M25_CLEAR if d is None else d
+    return unary_union([circle(d, 24, cx + dx - S.RS_X, cy + dy - S.RS_Y)
+                        for dx, dy in head_lugs_xy()])
 
 
 def optical_head():
-    """One solid Ø52 block, 6.2 -> 33.4, carrying all five optical paths.
+    """One solid Ø44 block, 6.2 -> 33.4, carrying all five optical paths.
 
     The five bores all aim at the read spot, so near the axis they merge --
     that merged volume IS the optical chamber (radius CHAMBER_R), not a
@@ -174,13 +223,16 @@ def optical_head():
     tube_clear = circle(APT_BARREL_D + 2 * 0.2, 48, S.RS_X, S.RS_Y)
     tube_cbore = circle(APT_FLANGE_D + 2 * 0.2, 64, S.RS_X, S.RS_Y)
     shaft = circle(S.SHAFT_D, 48, S.RS_X, S.RS_Y)
-    mount = unary_union([circle(S.M25_TAP, 24, x, y) for x, y in head_posts_xy()])
+    # fastening lives OUTSIDE the body: pads added to the profile, clearance
+    # holes through them. Nothing is cut through the optical volume any more.
+    pads = _lug_pads()
+    lug_holes = _lug_holes()
     names = ["led1", "led2", "ir", "laser", "camera"]
 
     pockets = BD.head_pockets()
 
     def profile(z):
-        g = disc
+        g = disc.union(pads)
         for n in names:
             g = g.difference(b[n].section(z))
         # drop-in pockets for the laser barrel and the camera board, both of
@@ -197,7 +249,7 @@ def optical_head():
             g = g.difference(tube_cbore)
         else:
             g = g.difference(shaft)
-        return g.difference(mount)
+        return g.difference(lug_holes)
 
     m = Mesh()
     # skirt: closes the 0.8 mm gap over the cartridge everywhere except the
@@ -245,15 +297,15 @@ def touch_collar():
 def sensor_deck():
     """Caps the head at Z_SENSOR and carries the AS7341. Separate part so the
     LEDs, laser and camera can all be fitted before it goes on."""
-    plate = circle(S.HEAD_DIA, 160)
+    # Ø44 plate plus three EARS out at the lug circle. The fixing screws are
+    # at r=28, well outside the 30.5 x 23 board and the 35.5 x 28 carrier, so
+    # nothing the AS7341 touches has a screw head under it.
+    plate = circle(S.HEAD_DIA, 160).union(_lug_pads(0.0, 0.0))
     shaft = circle(S.SHAFT_D, 48)
     holes = unary_union([circle(S.M2_CLEAR, 24,
                                 sx * S.AS_HOLE_DX / 2, sy * S.AS_HOLE_DY / 2)
                          for sx in (-1, 1) for sy in (-1, 1)])
-    posts = unary_union([circle(S.M25_CLEAR, 24,
-                                HEAD_POST_R * math.cos(math.radians(a)),
-                                HEAD_POST_R * math.sin(math.radians(a)))
-                         for a in HEAD_POST_AZ])
+    posts = _lug_holes(0.0, 0.0)
     # the laser is the one bore that exits the top face -- the deck must not
     # cap it. Its exit ellipse at HEAD_TOP, with clearance.
     # sized off the BARREL, not the light bore, with MIN_CLEAR each side
@@ -283,9 +335,18 @@ def slot_baffle():
     # notch for the cartridge switch. The switch body fills the notch, so the
     # baffle stays light-tight -- an open notch here would let the slot leak.
     notch = MG.switch_footprint(0.9)      # > MIN_CLEAR, so it is a fit not a rub
-    prof = outer.difference(gap).difference(
-        pl.affinity.translate(notch, 0.0, -(-S.ENV_Y / 2 + S.WALL
-                                            + S.BAFFLE_OFFSET)))
+    # ...and the same for any head-lug boss that crosses the baffle line. The
+    # az-305 boss does. Same argument as the switch: the boss is solid and
+    # fills the notch, so the slot stays light-tight.
+    dy = -(-S.ENV_Y / 2 + S.WALL + S.BAFFLE_OFFSET)
+    cuts = [pl.affinity.translate(notch, 0.0, dy)]
+    # S.FIT, not the switch's 0.9: the boss and this baffle are both printed
+    # from this same CAD, so they need a printed fit, not a bought-part
+    # tolerance. Every extra 0.1 mm here is 0.1 mm of light straight into the
+    # chamber -- see check_slot_light().
+    for lx, ly in head_lugs_xy():
+        cuts.append(circle(S.BOSS_OD + 2 * S.FIT, 40, lx, ly + dy))
+    prof = outer.difference(gap).difference(unary_union(cuts))
     return prism(prof, 0.0, HEAD_SKIRT_Z - S.SLOT_Z0 - 1.0)
 
 
@@ -364,9 +425,11 @@ def shell_lower():
     for x, y in S.pi_holes():
         m += _screw_column(x, y, 6.0, S.M25_TAP, S.FLOOR, S.PI_PCB_Z)
 
-    # --- optical head posts ------------------------------------------------
-    for x, y in head_posts_xy():
-        m += _screw_column(x, y, 6.4, S.M25_TAP, S.FLOOR, S.HEAD_Z0)
+    # --- optical head lugs -------------------------------------------------
+    # Three, outside the optical body. One M2.5 per lug runs deck ear -> head
+    # lug -> this boss, so a single screw column clamps the whole stack.
+    for x, y in head_lugs_xy():
+        m += _screw_column(x, y, S.BOSS_OD, S.M25_TAP, S.FLOOR, S.HEAD_Z0)
 
     # --- cartridge channel floor rails ------------------------------------
     rail_w = 2.0

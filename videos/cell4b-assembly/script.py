@@ -60,9 +60,10 @@ SCENES = [
              "the read spot, with its lens removed. Almost all of it ends up "
              "inside the head, so the block has a pocket cut for it."),
     dict(id="07_head", shot="07_head", part="Optical head",
-         where="4 posts at r = 15", how="M2.5 down onto the shell posts",
+         where="3 lugs at r = 28", how="M2.5 down through each lug into the shell",
          note="fit every emitter BEFORE this goes down",
-         say="Now the head drops onto its four posts. Fit every emitter before "
+         say="Now the head drops onto its three lugs. They sit outside the optical "
+             "body on purpose, so no screw ever crosses a bore. Fit every emitter before "
              "this point: once the deck is on, the LED bores are unreachable."),
     dict(id="08_ribbon", shot="08_ribbon", part="CSI ribbon",
          where="110 mm route", how="out the +X side, ON EDGE, then over the header",
@@ -106,9 +107,9 @@ SCENES = [
              "through hole, so one optical axis serves the finger above and the "
              "cartridge below."),
     dict(id="14_exploded", shot="14_exploded", kind="outro",
-         title="346 checks · 0 failed",
+         title="404 checks · 0 failed",
          sub="github.com/nickthelegend/cell-4b",
-         say="Thirteen printed parts, three hundred and forty six geometry "
+         say="Thirteen printed parts, four hundred and four geometry "
              "checks, and the build refuses to write an S T L if any of them "
              "fail. Everything is on GitHub."),
 ]

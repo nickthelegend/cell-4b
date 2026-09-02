@@ -67,12 +67,12 @@
   {
    "name": "optical_head",
    "qty": 1,
-   "triangles": 114992,
-   "volume_mm3": 31112.21,
+   "triangles": 137064,
+   "volume_mm3": 37944.8,
    "watertight": true,
    "bbox": [
-    44.0,
-    44.0,
+    54.5,
+    57.31,
     27.8
    ],
    "material": "black PLA",
@@ -83,12 +83,12 @@
   {
    "name": "sensor_deck",
    "qty": 1,
-   "triangles": 1588,
-   "volume_mm3": 3364.25,
+   "triangles": 1892,
+   "volume_mm3": 3957.69,
    "watertight": true,
    "bbox": [
-    44.0,
-    44.0,
+    54.5,
+    57.31,
     2.4
    ],
    "material": "black PLA",
@@ -115,11 +115,11 @@
   {
    "name": "slot_baffle",
    "qty": 1,
-   "triangles": 12,
-   "volume_mm3": 41.09,
+   "triangles": 28,
+   "volume_mm3": 20.54,
    "watertight": true,
    "bbox": [
-    10.7,
+    5.59,
     2.4,
     1.6
    ],
@@ -147,8 +147,8 @@
   {
    "name": "shell_lower",
    "qty": 1,
-   "triangles": 27692,
-   "volume_mm3": 54993.55,
+   "triangles": 27404,
+   "volume_mm3": 54886.16,
    "watertight": true,
    "bbox": [
     92.0,
@@ -250,8 +250,8 @@
     "window_jig": 1
    },
    "extent": [
-    238.0,
-    72.0
+    219.5,
+    89.3
    ],
    "fits_p1s": true,
    "glb": "plate3.glb"
@@ -389,7 +389,7 @@
   }
  ],
  "audit": {
-  "checks": 346,
+  "checks": 404,
   "failed": 0
  },
  "gaps": [
@@ -523,7 +523,7 @@
    "a": "shell_lower",
    "b": "slot_baffle",
    "kind": "contact",
-   "mm": 0.6,
+   "mm": 0.3,
    "status": "PASS"
   },
   {
@@ -551,7 +551,7 @@
    "a": "mock_laser",
    "b": "sensor_deck",
    "kind": "clear",
-   "mm": 1.19,
+   "mm": 1.2,
    "status": "PASS"
   },
   {
@@ -569,6 +569,13 @@
    "status": "PASS"
   },
   {
+   "a": "optical_head",
+   "b": "slot_baffle",
+   "kind": "clear",
+   "mm": 1.6,
+   "status": "PASS"
+  },
+  {
    "a": "sensor_carrier",
    "b": "sensor_deck",
    "kind": "contact",
@@ -576,17 +583,17 @@
    "status": "PASS"
   },
   {
-   "a": "optical_head",
-   "b": "slot_baffle",
-   "kind": "clear",
-   "mm": 1.65,
-   "status": "PASS"
-  },
-  {
    "a": "mock_as7341",
    "b": "optical_head",
    "kind": "clear",
    "mm": 1.72,
+   "status": "PASS"
+  },
+  {
+   "a": "sensor_deck",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 1.9,
    "status": "PASS"
   },
   {
@@ -625,6 +632,13 @@
    "status": "PASS"
   },
   {
+   "a": "optical_head",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 2.25,
+   "status": "PASS"
+  },
+  {
    "a": "mock_as7341",
    "b": "mock_laser",
    "kind": "clear",
@@ -636,6 +650,13 @@
    "b": "touch_collar",
    "kind": "clear",
    "mm": 2.4,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_csi_ribbon",
+   "b": "optical_head",
+   "kind": "clear",
+   "mm": 2.5,
    "status": "PASS"
   },
   {
@@ -730,6 +751,13 @@
    "status": "PASS"
   },
   {
+   "a": "sensor_deck",
+   "b": "shell_lower",
+   "kind": "clear",
+   "mm": 6.0,
+   "status": "PASS"
+  },
+  {
    "a": "shell_upper",
    "b": "touch_collar",
    "kind": "clear",
@@ -751,24 +779,10 @@
    "status": "PASS"
   },
   {
-   "a": "mock_leds",
-   "b": "shell_lower",
-   "kind": "clear",
-   "mm": 6.37,
-   "status": "PASS"
-  },
-  {
    "a": "mock_cartridge",
    "b": "mock_leds",
    "kind": "clear",
    "mm": 6.9,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_csi_ribbon",
-   "b": "optical_head",
-   "kind": "clear",
-   "mm": 7.6,
    "status": "PASS"
   },
   {
@@ -793,20 +807,6 @@
    "status": "PASS"
   },
   {
-   "a": "optical_head",
-   "b": "shell_upper",
-   "kind": "clear",
-   "mm": 13.49,
-   "status": "PASS"
-  },
-  {
-   "a": "sensor_deck",
-   "b": "shell_lower",
-   "kind": "clear",
-   "mm": 14.16,
-   "status": "PASS"
-  },
-  {
    "a": "mock_camera",
    "b": "mock_cartridge",
    "kind": "clear",
@@ -814,17 +814,17 @@
    "status": "PASS"
   },
   {
-   "a": "sensor_deck",
-   "b": "shell_upper",
-   "kind": "clear",
-   "mm": 14.7,
-   "status": "PASS"
-  },
-  {
    "a": "mock_laser",
    "b": "shell_lower",
    "kind": "clear",
-   "mm": 15.5,
+   "mm": 15.19,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_leds",
+   "b": "shell_lower",
+   "kind": "clear",
+   "mm": 16.28,
    "status": "PASS"
   },
   {

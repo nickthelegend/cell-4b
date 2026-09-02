@@ -21,8 +21,8 @@ python3 -m http.server 8731            # then localhost:8731/viewer/index.html
 ```
 
 `cad/build.py` **refuses to write anything** if `cad/audit.py` reports a
-failure, so any plate that reaches your slicer has already passed all 108
-checks.
+failure, so any plate that reaches your slicer has already passed every one
+of them. `out/manifest.json` records the count for the build you actually ran.
 
 ## What's in it
 
@@ -43,9 +43,9 @@ cad/partlib.py   pure-python CAD kernel: shapely profiles -> watertight shells,
                  manifold validator, STL + GLB writers, angled-bore mesher
 cad/spec.py      THE dimensional contract. Every number, tagged [OPTICS] /
                  [HARDWARE] / [DERIVED]
-cad/parts.py     the 12 printable parts
+cad/parts.py     the 13 printable parts
 cad/mocks.py     dimensional mock-ups of the bought parts, placed where they assemble
-cad/audit.py     108 fit checks
+cad/audit.py     fit, function, light and doc-drift checks
 cad/build.py     STLs, GLBs, plates, MANIFEST.md
 viewer/          three.js viewer (vendored, works offline)
 out/stl/         printable STLs
