@@ -131,6 +131,23 @@ column clamps the whole stack and never crosses a bore. Three is also the right
 number: it cannot rock, and the read spot sits inside the triangle they form.
 See `FINDINGS.md` §9.
 
+### Buy these, and do not over-torque them
+
+The screw column is 33.4 mm of stack, so the lug screws are **long**:
+
+| Screw | Length | Passes through | Threads into | Engagement |
+|---|---|---|---|---|
+| Head lugs × 3 | **M2.5 × 35** | deck ear 2.4 + head lug 27.2 | shell boss | **3.8 mm** |
+| AS7341 × 4 | **M2 × 8** | carrier 1.4 + board 1.6 | sensor deck | **2.4 mm** |
+| Pi × 4 | M2.5 × 6 | — | shell bosses | 4.0 mm |
+| Lid × 4 | M2.5 × 8 | counterbores | shell bosses | — |
+
+Engagement on the lugs is 1.5 × diameter and on the AS7341 1.2 ×, which is
+below the usual 2 × rule. The loads are grams, so it holds — but these are
+self-tapped into PLA, so run them in **by hand** and stop at first resistance.
+A stripped boss is not repairable. `audit.check_screws()` recomputes every
+number in this table from the geometry, so it cannot drift from the parts.
+
 The microswitch sits on the **−X** side of the slot. It moved there to free
 the 305° lug; the cartridge channel is symmetric, so nothing else changed.
 

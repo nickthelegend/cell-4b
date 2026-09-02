@@ -940,6 +940,42 @@ def check_docs():
     return ok
 
 
+def check_screws():
+    """Recompute every fastener stack, and hold ASSEMBLY.md to the answer.
+
+    A redesigned fastening changes what the builder has to BUY. The lug column
+    grew to 33.4 mm of stack when the screws moved outside the head, and a
+    table written by hand goes stale the first time a thickness changes.
+    """
+    import os
+    ok = True
+    lug = P.DECK_T + (S.HEAD_TOP - S.HEAD_Z0) + (S.HEAD_Z0 - S.FLOOR)
+    lug_eng = S.HEAD_Z0 - S.FLOOR
+    as_stack = P.CARRIER_T + S.AS_PCB_T + P.DECK_T
+    as_eng = P.DECK_T
+
+    ok &= _rec(lug_eng >= 3.0, "screw/lug-engagement",
+               f"{lug_eng:.1f} mm of M2.5 thread in the shell boss "
+               f"({lug_eng / 2.5:.1f} x diameter) -- self-tapped PLA, hand-tighten")
+    ok &= _rec(as_eng >= 2.0, "screw/as7341-engagement",
+               f"{as_eng:.1f} mm of M2 thread in the deck "
+               f"({as_eng / 2.0:.1f} x diameter)")
+
+    path = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "ASSEMBLY.md")
+    txt = open(path).read() if os.path.exists(path) else ""
+    # round UP to the next common stock length
+    for stack, want, label in ((lug, 35, "M2.5 \u00d7 35"),
+                               (as_stack, 8, "M2 \u00d7 8")):
+        ok &= _rec(stack <= want, f"screw/{label.replace(' ', '')}-long-enough",
+                   f"{stack:.1f} mm of stack needs a {want} mm screw")
+        ok &= _rec(f"**{label}**" in txt, f"docs/{label.replace(' ', '')}",
+                   f"ASSEMBLY.md must specify {label}")
+    ok &= _rec(f"**{lug_eng:.1f} mm**" in txt, "docs/lug-engagement",
+               f"ASSEMBLY.md must state the {lug_eng:.1f} mm lug engagement")
+    return ok
+
+
 def check_connected(meshes):
     """Every printed part must come out as ONE connected shell.
 
@@ -1192,6 +1228,7 @@ def run(meshes=None, sampled=True):
     check_bosses_clear_pi()
     check_head_lugs()
     check_fasteners()
+    check_screws()
     check_oled()
     check_ring_geometry()
     check_light_tight()
