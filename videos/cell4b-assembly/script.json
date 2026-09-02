@@ -79,12 +79,12 @@
   "id": "07_head",
   "shot": "07_head",
   "part": "Optical head",
-  "where": "4 posts at r = 15",
-  "how": "M2.5 down onto the shell posts",
+  "where": "3 lugs at r = 28",
+  "how": "M2.5 down through each lug into the shell",
   "note": "fit every emitter BEFORE this goes down",
-  "say": "Now the head drops onto its four posts. Fit every emitter before this point: once the deck is on, the LED bores are unreachable.",
+  "say": "Now the head drops onto its three lugs. They sit outside the optical body on purpose, so no screw ever crosses a bore. Fit every emitter before this point: once the deck is on, the LED bores are unreachable.",
   "wav": "assets/vo/07_head.wav",
-  "duration": 9.0
+  "duration": 14.05
  },
  {
   "id": "08_ribbon",
@@ -156,10 +156,10 @@
   "id": "14_exploded",
   "shot": "14_exploded",
   "kind": "outro",
-  "title": "346 checks \u00b7 0 failed",
+  "title": "404 checks \u00b7 0 failed",
   "sub": "github.com/nickthelegend/cell-4b",
-  "say": "Thirteen printed parts, three hundred and forty six geometry checks, and the build refuses to write an S T L if any of them fail. Everything is on GitHub.",
+  "say": "Thirteen printed parts, four hundred and four geometry checks, and the build refuses to write an S T L if any of them fail. Everything is on GitHub.",
   "wav": "assets/vo/14_exploded.wav",
-  "duration": 10.925
+  "duration": 10.425
  }
 ]
