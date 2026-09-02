@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0b0d10; }
+      body { font-family: "Inter", ui-sans-serif, system-ui, sans-serif; color: #eef2f7; }
+      .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+      .scene { position: absolute; inset: 0; width: 1920px; height: 1080px;
+                background: #0b0d10; overflow: hidden; }
+      .shotwrap { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+      .shot { width: 1920px; height: 1080px; object-fit: cover; display: block; }
+      .vig { position: absolute; inset: 0;
+              background: radial-gradient(ellipse at 62% 45%,
+                          rgba(0,0,0,0) 38%, rgba(0,0,0,.55) 100%); }
+
+      .counter { position: absolute; top: 54px; right: 64px; font-size: 22px;
+                  letter-spacing: .18em; color: #9aa4b2;
+                  font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+      .callout { position: absolute; left: 84px; bottom: 92px; width: 760px;
+                  padding: 34px 38px 30px; border-radius: 16px;
+                  background: rgba(9,11,14,.82);
+                  border: 1px solid rgba(255,255,255,.10);
+                  border-left: 4px solid #ff9d3c; }
+      .part { font-size: 44px; font-weight: 650; letter-spacing: -.02em;
+               margin-bottom: 20px; line-height: 1.1; }
+      .kv { display: flex; align-items: baseline; gap: 18px; margin-bottom: 10px; }
+      .k { flex: none; width: 88px; font-size: 15px; letter-spacing: .16em;
+            color: #9aa4b2; }
+      .v { font-size: 26px; line-height: 1.35; }
+      .v.mono { color: #ff9d3c; }
+      .note { margin-top: 18px; padding-top: 16px; font-size: 20px;
+               line-height: 1.45; color: #9aa4b2;
+               border-top: 1px solid rgba(255,255,255,.10); }
+
+      .card-mid { position: absolute; inset: 0; display: flex;
+                   flex-direction: column; align-items: center;
+                   justify-content: center; text-align: center; }
+      .big { font-size: 104px; font-weight: 700; letter-spacing: -.035em; }
+      .rule { height: 3px; width: 420px; background: #ff9d3c; margin: 26px 0 22px; }
+      .sub { font-size: 30px; color: #9aa4b2; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0"
+         data-duration="196.5" data-width="1920" data-height="1080">
+    <div class="clip scene" id="s00_title" data-start="0.000" data-duration="7.700">
+      <div class="shotwrap" id="s00_title-shot"></div>
+      <div class="vig"></div>
+      <div class="card-mid">
+        <div class="big" id="s00_title-big">CELL-4B</div>
+        <div class="rule" id="s00_title-rule"></div>
+        <div class="sub" id="s00_title-sub">assembly, component by component</div>
+      </div>
+    </div>
+    <div class="clip scene" id="s01_pi" data-start="7.700" data-duration="13.025">
+      <div class="shotwrap" id="s01_pi-shot"><img class="shot" src="assets/steps/01_pi.png" alt=""></div>
+      <div class="vig"></div>
+      <div class="counter" id="s01_pi-count">01 / 13</div>
+      <div class="callout" id="s01_pi-callout">
+        <div class="part">Raspberry Pi 4B</div>
+        <div class="kv"><span class="k">WHERE</span><span class="v mono">(0, 33.6, 6.4)</span></div>
+        <div class="kv"><span class="k">HOW</span><span class="v">4 x M2.5 into the 58 x 49 bosses</span></div>
+        <div class="note">GPIO header faces the FRONT, toward the optics</div>
+      </div>
+    </div>
+    <div class="clip scene" id="s02_switch" data-start="20.725" data-duration="13.375">
+      <div class="shotwrap" id="s02_switch-shot"><img class="shot" src="assets/steps/02_switch.png" alt=""></div>
+      <div class="vig"></div>
+      <div class="counter" id="s02_switch-count">02 / 13</div>
+      <div class="callout" id="s02_switch-callout">
+        <div class="part">Cartridge switch</div>
+        <div class="kv"><span class="k">WHERE</span><span class="v mono">(14.0, -58.2, 2.4)</span></div>
+        <div class="kv"><span class="k">HOW</span><span class="v">lever into the cartridge channel</span></div>
+        <div class="note">ALSO the laser interlock — wire it in series with the laser supply</div>
+      </div>
+    </div>
+    <div class="clip scene" id="s03_baffle" data-start="34.100" data-duration="12.050">
+      <div class="shotwrap" id="s03_baffle-shot"><img class="shot" src="assets/steps/03_baffle.png" alt=""></div>
+      <div class="vig"></div>
+      <div class="counter" id="s03_baffle-count">03 / 13</div>
+      <div class="callout" id="s03_baffle-callout">
+        <div class="part">Slot baffle</div>
+        <div class="kv"><span class="k">WHERE</span><span class="v mono">6 mm behind the slot mouth</span></div>
+        <div class="kv"><span class="k">HOW</span><span class="v">press fit, notch over the switch</span></div>
+        <div class="note">stops 1 mm below the head skirt — together they are light-tight</div>
+      </div>
+    </div>
+    <div class="clip scene" id="s04_leds" data-start="46.150" data-duration="15.950">
+      <div class="shotwrap" id="s04_leds-shot"><img class="shot" src="assets/steps/04_leds.png" alt=""></div>
+      <div class="vig"></div>
+      <div class="counter" id="s04_leds-count">04 / 13</div>
+      <div class="callout" id="s04_leds-callout">
+        <div class="part">White LEDs + 940 nm IR</div>
+        <div class="kv"><span class="k">WHERE</span><span class="v mono">45°, 12.00 mm from the read spot</span></div>
+        <div class="kv"><span class="k">HOW</span><span class="v">from OUTSIDE, into the three side bores</span></div>
+        <div class="note">azimuth 45 and 225 for the whites, 135 for the IR</div>
+      </div>
+    </div>
+    <div class="clip scene" id="s05_laser" data-start="62.100" data-duration="16.300">
+      <div class="shotwrap" id="s05_laser-shot"><img class="shot" src="assets/steps/05_laser.png" alt=""></div>
+      <div class="vig"></div>
+      <div class="counter" id="s05_laser-count">05 / 13</div>
+      <div class="callout" id="s05_laser-callout">
+        <div class="part">650 nm laser</div>
+        <div class="kv"><span class="k">WHERE</span><span class="v mono">30°, azimuth 270, 22.00 mm</span></div>
+        <div class="kv"><span class="k">HOW</span><span class="v">the one bore that exits the head&#x27;s TOP</span></div>
+        <div class="note">coherent source is mandatory — an LED makes no speckle at all</div>
+      </div>
+    </div>
+    <div class="clip scene" id="s06_camera" data-start="78.400" data-duration="12.725">
+      <div class="shotwrap" id="s06_camera-shot"><img class="shot" src="assets/steps/06_camera.png" alt=""></div>
+      <div class="vig"></div>
+      <div class="counter" id="s06_camera-count">06 / 13</div>
+      <div class="callout" id="s06_camera-callout">
+        <div class="part">OV5647 camera</div>
+        <div class="kv"><span class="k">WHERE</span><span class="v mono">45°, azimuth 0, 20.00 mm</span></div>
+        <div class="kv"><span class="k">HOW</span><span class="v">lens REMOVED, into its own pocket</span></div>
+        <div class="note">96% of it sits inside the head — the pocket is cut for it</div>
+      </div>
+    </div>
+    <div class="clip scene" id="s07_head" data-start="91.125" data-duration="9.450">
+      <div class="shotwrap" id="s07_head-shot"><img class="shot" src="assets/steps/07_head.png" alt=""></div>
+      <div class="vig"></div>
+      <div class="counter" id="s07_head-count">07 / 13</div>
+      <div class="callout" id="s07_head-callout">
+        <div class="part">Optical head</div>
+        <div class="kv"><span class="k">WHERE</span><span class="v mono">4 posts at r = 15</span></div>
+        <div class="kv"><span class="k">HOW</span><span class="v">M2.5 down onto the shell posts</span></div>
+        <div class="note">fit every emitter BEFORE this goes down</div>
+      </div>
+    </div>
+    <div class="clip scene" id="s08_ribbon" data-start="100.575" data-duration="15.675">
+      <div class="shotwrap" id="s08_ribbon-shot"><img class="shot" src="assets/steps/08_ribbon.png" alt=""></div>
+      <div class="vig"></div>
+      <div class="counter" id="s08_ribbon-count">08 / 13</div>
+      <div class="callout" id="s08_ribbon-callout">
+        <div class="part">CSI ribbon</div>
+        <div class="kv"><span class="k">WHERE</span><span class="v mono">110 mm route</span></div>
+        <div class="kv"><span class="k">HOW</span><span class="v">out the +X side, ON EDGE, then over the header</span></div>
+        <div class="note">buy 150 mm — a 100 mm ribbon will not reach</div>
+      </div>
+    </div>
+    <div class="clip scene" id="s09_tube" data-start="116.250" data-duration="11.475">
+      <div class="shotwrap" id="s09_tube-shot"><img class="shot" src="assets/steps/09_tube.png" alt=""></div>
+      <div class="vig"></div>
+      <div class="counter" id="s09_tube-count">09 / 13</div>
+      <div class="callout" id="s09_tube-callout">
+        <div class="part">Aperture tube</div>
+        <div class="kv"><span class="k">WHERE</span><span class="v mono">(0, -32.4, 7.4)</span></div>
+        <div class="kv"><span class="k">HOW</span><span class="v">flange UP into the counterbore</span></div>
+        <div class="note">Ø3 × 6 — this is what fixes the 3 mm spot</div>
+      </div>
+    </div>
+    <div class="clip scene" id="s10_as7341" data-start="127.725" data-duration="16.050">
+      <div class="shotwrap" id="s10_as7341-shot"><img class="shot" src="assets/steps/10_as7341.png" alt=""></div>
+      <div class="vig"></div>
+      <div class="counter" id="s10_as7341-count">10 / 13</div>
+      <div class="callout" id="s10_as7341-callout">
+        <div class="part">AS7341 — the flip-mount</div>
+        <div class="kv"><span class="k">WHERE</span><span class="v mono">chip DOWN at 35.8 · chip UP at 37.4</span></div>
+        <div class="kv"><span class="k">HOW</span><span class="v">one board, one pad, two orientations</span></div>
+        <div class="note">chip down reads the cartridge; chip up reads a fingertip</div>
+      </div>
+    </div>
+    <div class="clip scene" id="s11_touch" data-start="143.775" data-duration="12.075">
+      <div class="shotwrap" id="s11_touch-shot"><img class="shot" src="assets/steps/11_touch.png" alt=""></div>
+      <div class="vig"></div>
+      <div class="counter" id="s11_touch-count">11 / 13</div>
+      <div class="callout" id="s11_touch-callout">
+        <div class="part">Touch collar</div>
+        <div class="kv"><span class="k">WHERE</span><span class="v mono">45° UP, azimuth 0 and 180</span></div>
+        <div class="kv"><span class="k">HOW</span><span class="v">white + IR aimed at the fingertip</span></div>
+        <div class="note">same 45°/12 mm geometry as the blood tier, pointed the other way</div>
+      </div>
+    </div>
+    <div class="clip scene" id="s12_cartridge" data-start="155.850" data-duration="14.625">
+      <div class="shotwrap" id="s12_cartridge-shot"><img class="shot" src="assets/steps/12_cartridge.png" alt=""></div>
+      <div class="vig"></div>
+      <div class="counter" id="s12_cartridge-count">12 / 13</div>
+      <div class="callout" id="s12_cartridge-callout">
+        <div class="part">Cartridge</div>
+        <div class="kv"><span class="k">WHERE</span><span class="v mono">slides to STOP2, 42.1 mm in</span></div>
+        <div class="kv"><span class="k">HOW</span><span class="v">well lands on the read spot</span></div>
+        <div class="note">8.9 mm stays proud — that is what you pull it out by</div>
+      </div>
+    </div>
+    <div class="clip scene" id="s13_close" data-start="170.475" data-duration="14.650">
+      <div class="shotwrap" id="s13_close-shot"><img class="shot" src="assets/steps/13_close.png" alt=""></div>
+      <div class="vig"></div>
+      <div class="counter" id="s13_close-count">13 / 13</div>
+      <div class="callout" id="s13_close-callout">
+        <div class="part">OLED, windows, upper shell</div>
+        <div class="kv"><span class="k">WHERE</span><span class="v mono">ceiling</span></div>
+        <div class="kv"><span class="k">HOW</span><span class="v">Ø10 window goes in from BELOW</span></div>
+        <div class="note">the ring port is a through-hole — one axis, finger above, cartridge below</div>
+      </div>
+    </div>
+    <div class="clip scene" id="s14_exploded" data-start="185.125" data-duration="11.375">
+      <div class="shotwrap" id="s14_exploded-shot"><img class="shot" src="assets/steps/14_exploded.png" alt=""></div>
+      <div class="vig"></div>
+      <div class="card-mid">
+        <div class="big" id="s14_exploded-big">346 checks · 0 failed</div>
+        <div class="rule" id="s14_exploded-rule"></div>
+        <div class="sub" id="s14_exploded-sub">github.com/nickthelegend/cell-4b</div>
+      </div>
+    </div>
+
+    <audio id="vo-s00_title" src="assets/vo/00_title.wav" data-start="0.000"></audio>
+    <audio id="vo-s01_pi" src="assets/vo/01_pi.wav" data-start="7.700"></audio>
+    <audio id="vo-s02_switch" src="assets/vo/02_switch.wav" data-start="20.725"></audio>
+    <audio id="vo-s03_baffle" src="assets/vo/03_baffle.wav" data-start="34.100"></audio>
+    <audio id="vo-s04_leds" src="assets/vo/04_leds.wav" data-start="46.150"></audio>
+    <audio id="vo-s05_laser" src="assets/vo/05_laser.wav" data-start="62.100"></audio>
+    <audio id="vo-s06_camera" src="assets/vo/06_camera.wav" data-start="78.400"></audio>
+    <audio id="vo-s07_head" src="assets/vo/07_head.wav" data-start="91.125"></audio>
+    <audio id="vo-s08_ribbon" src="assets/vo/08_ribbon.wav" data-start="100.575"></audio>
+    <audio id="vo-s09_tube" src="assets/vo/09_tube.wav" data-start="116.250"></audio>
+    <audio id="vo-s10_as7341" src="assets/vo/10_as7341.wav" data-start="127.725"></audio>
+    <audio id="vo-s11_touch" src="assets/vo/11_touch.wav" data-start="143.775"></audio>
+    <audio id="vo-s12_cartridge" src="assets/vo/12_cartridge.wav" data-start="155.850"></audio>
+    <audio id="vo-s13_close" src="assets/vo/13_close.wav" data-start="170.475"></audio>
+    <audio id="vo-s14_exploded" src="assets/vo/14_exploded.wav" data-start="185.125"></audio>
+    </div>
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#s00_title-big", { autoAlpha: 0, y: 34 }, { autoAlpha: 1, y: 0, duration: 0.8, ease: "power3.out" }, 0.000);
+      tl.fromTo("#s00_title-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: "power3.inOut" }, 0.550);
+      tl.fromTo("#s00_title-sub", { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.900);
+      tl.fromTo("#s01_pi-shot", { scale: 1.0, xPercent: 0 }, { scale: 1.06, xPercent: -1, duration: 13.025, ease: "none" }, 7.700);
+      tl.fromTo("#s01_pi-callout", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 7.700);
+      tl.fromTo("#s01_pi-count", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 7.700);
+      tl.to("#s01_pi-callout", { autoAlpha: 0, duration: 0.35 }, 20.375);
+      tl.set("#s01_pi-callout", { autoAlpha: 0 }, 20.725);
+      tl.set("#s01_pi-count", { autoAlpha: 0 }, 20.725);
+      tl.fromTo("#s02_switch-shot", { scale: 1.0, xPercent: 0 }, { scale: 1.06, xPercent: -1, duration: 13.375, ease: "none" }, 20.725);
+      tl.fromTo("#s02_switch-callout", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 20.725);
+      tl.fromTo("#s02_switch-count", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 20.725);
+      tl.to("#s02_switch-callout", { autoAlpha: 0, duration: 0.35 }, 33.750);
+      tl.set("#s02_switch-callout", { autoAlpha: 0 }, 34.100);
+      tl.set("#s02_switch-count", { autoAlpha: 0 }, 34.100);
+      tl.fromTo("#s03_baffle-shot", { scale: 1.0, xPercent: 0 }, { scale: 1.06, xPercent: -1, duration: 12.050, ease: "none" }, 34.100);
+      tl.fromTo("#s03_baffle-callout", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 34.100);
+      tl.fromTo("#s03_baffle-count", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 34.100);
+      tl.to("#s03_baffle-callout", { autoAlpha: 0, duration: 0.35 }, 45.800);
+      tl.set("#s03_baffle-callout", { autoAlpha: 0 }, 46.150);
+      tl.set("#s03_baffle-count", { autoAlpha: 0 }, 46.150);
+      tl.fromTo("#s04_leds-shot", { scale: 1.0, xPercent: 0 }, { scale: 1.06, xPercent: -1, duration: 15.950, ease: "none" }, 46.150);
+      tl.fromTo("#s04_leds-callout", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 46.150);
+      tl.fromTo("#s04_leds-count", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 46.150);
+      tl.to("#s04_leds-callout", { autoAlpha: 0, duration: 0.35 }, 61.750);
+      tl.set("#s04_leds-callout", { autoAlpha: 0 }, 62.100);
+      tl.set("#s04_leds-count", { autoAlpha: 0 }, 62.100);
+      tl.fromTo("#s05_laser-shot", { scale: 1.0, xPercent: 0 }, { scale: 1.06, xPercent: -1, duration: 16.300, ease: "none" }, 62.100);
+      tl.fromTo("#s05_laser-callout", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 62.100);
+      tl.fromTo("#s05_laser-count", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 62.100);
+      tl.to("#s05_laser-callout", { autoAlpha: 0, duration: 0.35 }, 78.050);
+      tl.set("#s05_laser-callout", { autoAlpha: 0 }, 78.400);
+      tl.set("#s05_laser-count", { autoAlpha: 0 }, 78.400);
+      tl.fromTo("#s06_camera-shot", { scale: 1.0, xPercent: 0 }, { scale: 1.06, xPercent: -1, duration: 12.725, ease: "none" }, 78.400);
+      tl.fromTo("#s06_camera-callout", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 78.400);
+      tl.fromTo("#s06_camera-count", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 78.400);
+      tl.to("#s06_camera-callout", { autoAlpha: 0, duration: 0.35 }, 90.775);
+      tl.set("#s06_camera-callout", { autoAlpha: 0 }, 91.125);
+      tl.set("#s06_camera-count", { autoAlpha: 0 }, 91.125);
+      tl.fromTo("#s07_head-shot", { scale: 1.0, xPercent: 0 }, { scale: 1.06, xPercent: -1, duration: 9.450, ease: "none" }, 91.125);
+      tl.fromTo("#s07_head-callout", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 91.125);
+      tl.fromTo("#s07_head-count", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 91.125);
+      tl.to("#s07_head-callout", { autoAlpha: 0, duration: 0.35 }, 100.225);
+      tl.set("#s07_head-callout", { autoAlpha: 0 }, 100.575);
+      tl.set("#s07_head-count", { autoAlpha: 0 }, 100.575);
+      tl.fromTo("#s08_ribbon-shot", { scale: 1.0, xPercent: 0 }, { scale: 1.06, xPercent: -1, duration: 15.675, ease: "none" }, 100.575);
+      tl.fromTo("#s08_ribbon-callout", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 100.575);
+      tl.fromTo("#s08_ribbon-count", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 100.575);
+      tl.to("#s08_ribbon-callout", { autoAlpha: 0, duration: 0.35 }, 115.900);
+      tl.set("#s08_ribbon-callout", { autoAlpha: 0 }, 116.250);
+      tl.set("#s08_ribbon-count", { autoAlpha: 0 }, 116.250);
+      tl.fromTo("#s09_tube-shot", { scale: 1.0, xPercent: 0 }, { scale: 1.06, xPercent: -1, duration: 11.475, ease: "none" }, 116.250);
+      tl.fromTo("#s09_tube-callout", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 116.250);
+      tl.fromTo("#s09_tube-count", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 116.250);
+      tl.to("#s09_tube-callout", { autoAlpha: 0, duration: 0.35 }, 127.375);
+      tl.set("#s09_tube-callout", { autoAlpha: 0 }, 127.725);
+      tl.set("#s09_tube-count", { autoAlpha: 0 }, 127.725);
+      tl.fromTo("#s10_as7341-shot", { scale: 1.0, xPercent: 0 }, { scale: 1.06, xPercent: -1, duration: 16.050, ease: "none" }, 127.725);
+      tl.fromTo("#s10_as7341-callout", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 127.725);
+      tl.fromTo("#s10_as7341-count", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 127.725);
+      tl.to("#s10_as7341-callout", { autoAlpha: 0, duration: 0.35 }, 143.425);
+      tl.set("#s10_as7341-callout", { autoAlpha: 0 }, 143.775);
+      tl.set("#s10_as7341-count", { autoAlpha: 0 }, 143.775);
+      tl.fromTo("#s11_touch-shot", { scale: 1.0, xPercent: 0 }, { scale: 1.06, xPercent: -1, duration: 12.075, ease: "none" }, 143.775);
+      tl.fromTo("#s11_touch-callout", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 143.775);
+      tl.fromTo("#s11_touch-count", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 143.775);
+      tl.to("#s11_touch-callout", { autoAlpha: 0, duration: 0.35 }, 155.500);
+      tl.set("#s11_touch-callout", { autoAlpha: 0 }, 155.850);
+      tl.set("#s11_touch-count", { autoAlpha: 0 }, 155.850);
+      tl.fromTo("#s12_cartridge-shot", { scale: 1.0, xPercent: 0 }, { scale: 1.06, xPercent: -1, duration: 14.625, ease: "none" }, 155.850);
+      tl.fromTo("#s12_cartridge-callout", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 155.850);
+      tl.fromTo("#s12_cartridge-count", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 155.850);
+      tl.to("#s12_cartridge-callout", { autoAlpha: 0, duration: 0.35 }, 170.125);
+      tl.set("#s12_cartridge-callout", { autoAlpha: 0 }, 170.475);
+      tl.set("#s12_cartridge-count", { autoAlpha: 0 }, 170.475);
+      tl.fromTo("#s13_close-shot", { scale: 1.0, xPercent: 0 }, { scale: 1.06, xPercent: -1, duration: 14.650, ease: "none" }, 170.475);
+      tl.fromTo("#s13_close-callout", { autoAlpha: 0, y: 26 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, 170.475);
+      tl.fromTo("#s13_close-count", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 170.475);
+      tl.to("#s13_close-callout", { autoAlpha: 0, duration: 0.35 }, 184.775);
+      tl.set("#s13_close-callout", { autoAlpha: 0 }, 185.125);
+      tl.set("#s13_close-count", { autoAlpha: 0 }, 185.125);
+      tl.fromTo("#s14_exploded-shot", { scale: 1.0, xPercent: 0 }, { scale: 1.06, xPercent: -1, duration: 11.375, ease: "none" }, 185.125);
+      tl.fromTo("#s14_exploded-big", { autoAlpha: 0, y: 34 }, { autoAlpha: 1, y: 0, duration: 0.8, ease: "power3.out" }, 185.125);
+      tl.fromTo("#s14_exploded-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: "power3.inOut" }, 185.675);
+      tl.fromTo("#s14_exploded-sub", { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, 186.025);
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,58 @@
+{
+ "01_pi": {
+  "file": "assets/steps/01_pi.png",
+  "model": "Build step 1 - Pi 4B on its bosses"
+ },
+ "02_switch": {
+  "file": "assets/steps/02_switch.png",
+  "model": "Build step 1 - Pi 4B on its bosses"
+ },
+ "03_baffle": {
+  "file": "assets/steps/03_baffle.png",
+  "model": "Build step 2 - slot baffle"
+ },
+ "04_leds": {
+  "file": "assets/steps/04_leds.png",
+  "model": "Cutaway \u2014 inside the optical head"
+ },
+ "05_laser": {
+  "file": "assets/steps/05_laser.png",
+  "model": "Cutaway \u2014 inside the optical head"
+ },
+ "06_camera": {
+  "file": "assets/steps/06_camera.png",
+  "model": "Cutaway \u2014 inside the optical head"
+ },
+ "07_head": {
+  "file": "assets/steps/07_head.png",
+  "model": "Build step 4 - optical head down"
+ },
+ "08_ribbon": {
+  "file": "assets/steps/08_ribbon.png",
+  "model": "Cutaway \u2014 inside the optical head"
+ },
+ "09_tube": {
+  "file": "assets/steps/09_tube.png",
+  "model": "Cutaway \u2014 inside the optical head"
+ },
+ "10_as7341": {
+  "file": "assets/steps/10_as7341.png",
+  "model": "Build step 8 - AS7341 on the flip-mount"
+ },
+ "11_touch": {
+  "file": "assets/steps/11_touch.png",
+  "model": "Build step 9 - touch collar + its LEDs"
+ },
+ "12_cartridge": {
+  "file": "assets/steps/12_cartridge.png",
+  "model": "Build step 10 - cartridge in to stop 2"
+ },
+ "13_close": {
+  "file": "assets/steps/13_close.png",
+  "model": "Build step 11 - upper shell, OLED, windows"
+ },
+ "14_exploded": {
+  "file": "assets/steps/14_exploded.png",
+  "model": "Exploded"
+ }
+}
