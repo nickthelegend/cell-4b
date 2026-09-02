@@ -48,15 +48,18 @@ PRINT_SETTINGS = {
     "shell_upper": ("black PLA", "0.16 mm, 4 perim, 25%",
                     "TOP FACE DOWN, no supports"),
     "oled_bezel": ("black PLA", "0.12 mm, 4 perim, 100%", "flat, front face down"),
-    "sensor_carrier": ("black PLA", "0.16 mm, 4 perim, 100%", "flat"),
+    "sensor_carrier": ("black PLA", "0.16 mm, 4 perim, 100%",
+                       "flat; SYMMETRIC -- it clamps the AS7341 either way up"),
+    "touch_collar": ("black PLA", "0.12 mm, 5 perim, 40%",
+                     "base down; paint the bores matte black"),
 }
 
 PLATES = [
     ("Plate 1 - shell lower", ["shell_lower"]),
     ("Plate 2 - shell upper", ["shell_upper"]),
     ("Plate 3 - optics + small parts",
-     ["optical_head", "sensor_deck", "aperture_tube", "slot_baffle",
-      "oled_bezel", "sensor_carrier", "window_jig"]),
+     ["optical_head", "sensor_deck", "touch_collar", "aperture_tube",
+      "slot_baffle", "oled_bezel", "sensor_carrier", "window_jig"]),
     ("Plate 4 - cartridges",
      ["cartridge"] * 20 + ["cartridge_reference", "cartridge_null"]),
 ]
@@ -182,10 +185,11 @@ def main():
         ("5 - CSI ribbon routed", ["mock_csi_ribbon"]),
         ("6 - aperture tube", ["aperture_tube"]),
         ("7 - sensor deck", ["sensor_deck"]),
-        ("8 - AS7341 + retainer", ["mock_as7341", "sensor_carrier"]),
-        ("9 - cartridge in to stop 2", ["mock_cartridge"]),
-        ("10 - upper shell, OLED, windows",
-         ["shell_upper", "mock_oled", "oled_bezel", "mock_ring_window"]),
+        ("8 - AS7341 on the flip-mount", ["mock_as7341", "sensor_carrier"]),
+        ("9 - touch collar + its LEDs", ["touch_collar", "mock_touch_leds"]),
+        ("10 - cartridge in to stop 2", ["mock_cartridge"]),
+        ("11 - upper shell, OLED, windows",
+         ["shell_upper", "mock_oled", "oled_bezel", "mock_touch_window"]),
     ]
 
     def look(n):
@@ -219,9 +223,10 @@ def main():
         "optical_head": 2, "mock_csi_ribbon": 2,
         "aperture_tube": 3, "sensor_deck": 4,
         "mock_as7341": 5, "sensor_carrier": 5,
+        "touch_collar": 6, "mock_touch_leds": 6,
         "mock_cartridge": 1,
-        "shell_upper": 7, "mock_oled": 7, "oled_bezel": 8,
-        "mock_ring_window": 8,
+        "shell_upper": 8, "mock_oled": 8, "oled_bezel": 9,
+        "mock_touch_window": 9,
     }
     GAP = 26.0
     exploded = []
@@ -239,7 +244,7 @@ def main():
            ("aperture_tube", placed["aperture_tube"], "#2E3238", 1.0),
            ("slot_baffle", placed["slot_baffle"], "#2E3238", 1.0)]
     for n, m, c, a in mock_items:
-        if n in ("mock_oled", "mock_ring_window"):
+        if n in ("mock_oled", "mock_touch_window"):
             continue
         cut.append((n, m, c, a))
     pl.glb_write(os.path.join(GLB, "cutaway.glb"), cut)

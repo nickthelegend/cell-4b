@@ -97,6 +97,22 @@
    "colour": "#2E3238"
   },
   {
+   "name": "touch_collar",
+   "qty": 1,
+   "triangles": 22344,
+   "volume_mm3": 3360.12,
+   "watertight": true,
+   "bbox": [
+    24.0,
+    24.0,
+    10.6
+   ],
+   "material": "black PLA",
+   "settings": "0.12 mm, 5 perim, 40%",
+   "orientation": "base down; paint the bores matte black",
+   "colour": "#3A4048"
+  },
+  {
    "name": "slot_baffle",
    "qty": 1,
    "triangles": 12,
@@ -147,13 +163,13 @@
   {
    "name": "shell_upper",
    "qty": 1,
-   "triangles": 9184,
-   "volume_mm3": 37612.22,
+   "triangles": 9700,
+   "volume_mm3": 65136.27,
    "watertight": true,
    "bbox": [
     92.0,
     128.0,
-    18.0
+    33.8
    ],
    "material": "black PLA",
    "settings": "0.16 mm, 4 perim, 25%",
@@ -180,16 +196,16 @@
    "name": "sensor_carrier",
    "qty": 1,
    "triangles": 736,
-   "volume_mm3": 1005.25,
+   "volume_mm3": 781.86,
    "watertight": true,
    "bbox": [
     35.5,
     28.0,
-    1.8
+    1.4
    ],
    "material": "black PLA",
    "settings": "0.16 mm, 4 perim, 100%",
-   "orientation": "flat",
+   "orientation": "flat; SYMMETRIC -- it clamps the AS7341 either way up",
    "colour": "#2E3238"
   }
  ],
@@ -226,6 +242,7 @@
    "parts": {
     "optical_head": 1,
     "sensor_deck": 1,
+    "touch_collar": 1,
     "aperture_tube": 1,
     "slot_baffle": 1,
     "oled_bezel": 1,
@@ -234,7 +251,7 @@
    },
    "extent": [
     238.0,
-    58.0
+    72.0
    ],
    "fits_p1s": true,
    "glb": "plate3.glb"
@@ -259,7 +276,7 @@
   "envelope": [
    92.0,
    128.0,
-   44.0
+   59.8
   ],
   "read_spot": [
    0.0,
@@ -327,6 +344,14 @@
  },
  "mocks": [
   {
+   "name": "mock_touch_leds",
+   "colour": "#E8E4D0"
+  },
+  {
+   "name": "mock_touch_window",
+   "colour": "#9FD8E8"
+  },
+  {
    "name": "mock_csi_ribbon",
    "colour": "#C8A24A"
   },
@@ -355,10 +380,6 @@
    "colour": "#1A2A3A"
   },
   {
-   "name": "mock_ring_window",
-   "colour": "#9FD8E8"
-  },
-  {
    "name": "mock_switch",
    "colour": "#6B6B6B"
   },
@@ -368,7 +389,7 @@
   }
  ],
  "audit": {
-  "checks": 315,
+  "checks": 346,
   "failed": 0
  },
  "gaps": [
@@ -403,13 +424,6 @@
   {
    "a": "mock_pi4b",
    "b": "shell_lower",
-   "kind": "contact",
-   "mm": 0.0,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_ring_window",
-   "b": "shell_upper",
    "kind": "contact",
    "mm": 0.0,
    "status": "PASS"
@@ -457,10 +471,24 @@
    "status": "PASS"
   },
   {
+   "a": "mock_touch_leds",
+   "b": "touch_collar",
+   "kind": "contact",
+   "mm": 0.06,
+   "status": "PASS"
+  },
+  {
    "a": "mock_leds",
    "b": "optical_head",
    "kind": "contact",
    "mm": 0.07,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_touch_window",
+   "b": "shell_upper",
+   "kind": "contact",
+   "mm": 0.1,
    "status": "PASS"
   },
   {
@@ -506,6 +534,13 @@
    "status": "PASS"
   },
   {
+   "a": "sensor_carrier",
+   "b": "touch_collar",
+   "kind": "clear",
+   "mm": 1.0,
+   "status": "PASS"
+  },
+  {
    "a": "mock_camera",
    "b": "mock_leds",
    "kind": "clear",
@@ -517,6 +552,13 @@
    "b": "sensor_deck",
    "kind": "clear",
    "mm": 1.19,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_touch_leds",
+   "b": "sensor_carrier",
+   "kind": "clear",
+   "mm": 1.27,
    "status": "PASS"
   },
   {
@@ -590,10 +632,17 @@
    "status": "PASS"
   },
   {
-   "a": "sensor_carrier",
-   "b": "shell_upper",
+   "a": "mock_as7341",
+   "b": "touch_collar",
    "kind": "clear",
    "mm": 2.4,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_as7341",
+   "b": "mock_touch_leds",
+   "kind": "clear",
+   "mm": 2.67,
    "status": "PASS"
   },
   {
@@ -608,13 +657,6 @@
    "b": "mock_laser",
    "kind": "clear",
    "mm": 2.97,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_oled",
-   "b": "oled_bezel",
-   "kind": "contact",
-   "mm": 3.1,
    "status": "PASS"
   },
   {
@@ -639,24 +681,24 @@
    "status": "PASS"
   },
   {
-   "a": "mock_as7341",
-   "b": "shell_upper",
-   "kind": "clear",
-   "mm": 4.2,
+   "a": "sensor_deck",
+   "b": "touch_collar",
+   "kind": "contact",
+   "mm": 4.0,
    "status": "PASS"
   },
   {
-   "a": "mock_ring_window",
-   "b": "sensor_carrier",
-   "kind": "clear",
-   "mm": 4.48,
+   "a": "mock_oled",
+   "b": "oled_bezel",
+   "kind": "contact",
+   "mm": 4.1,
    "status": "PASS"
   },
   {
-   "a": "mock_as7341",
-   "b": "mock_ring_window",
+   "a": "mock_touch_leds",
+   "b": "sensor_deck",
    "kind": "clear",
-   "mm": 4.6,
+   "mm": 4.27,
    "status": "PASS"
   },
   {
@@ -681,10 +723,17 @@
    "status": "PASS"
   },
   {
-   "a": "sensor_deck",
-   "b": "shell_upper",
+   "a": "mock_laser",
+   "b": "touch_collar",
    "kind": "clear",
-   "mm": 5.8,
+   "mm": 5.37,
+   "status": "PASS"
+  },
+  {
+   "a": "shell_upper",
+   "b": "touch_collar",
+   "kind": "clear",
+   "mm": 6.0,
    "status": "PASS"
   },
   {
@@ -692,6 +741,13 @@
    "b": "mock_leds",
    "kind": "clear",
    "mm": 6.05,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_touch_window",
+   "b": "touch_collar",
+   "kind": "clear",
+   "mm": 6.12,
    "status": "PASS"
   },
   {
@@ -716,10 +772,10 @@
    "status": "PASS"
   },
   {
-   "a": "optical_head",
+   "a": "mock_touch_leds",
    "b": "shell_upper",
    "kind": "clear",
-   "mm": 8.2,
+   "mm": 8.43,
    "status": "PASS"
   },
   {
@@ -730,13 +786,6 @@
    "status": "PASS"
   },
   {
-   "a": "mock_laser",
-   "b": "shell_upper",
-   "kind": "clear",
-   "mm": 9.69,
-   "status": "PASS"
-  },
-  {
    "a": "mock_csi_ribbon",
    "b": "mock_leds",
    "kind": "clear",
@@ -744,10 +793,10 @@
    "status": "PASS"
   },
   {
-   "a": "mock_camera",
+   "a": "optical_head",
    "b": "shell_upper",
    "kind": "clear",
-   "mm": 12.97,
+   "mm": 13.49,
    "status": "PASS"
   },
   {
@@ -765,6 +814,13 @@
    "status": "PASS"
   },
   {
+   "a": "sensor_deck",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 14.7,
+   "status": "PASS"
+  },
+  {
    "a": "mock_laser",
    "b": "shell_lower",
    "kind": "clear",
@@ -772,17 +828,38 @@
    "status": "PASS"
   },
   {
+   "a": "mock_laser",
+   "b": "mock_touch_leds",
+   "kind": "clear",
+   "mm": 17.51,
+   "status": "PASS"
+  },
+  {
+   "a": "sensor_carrier",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 17.6,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_camera",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 18.35,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_as7341",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 19.0,
+   "status": "PASS"
+  },
+  {
    "a": "aperture_tube",
    "b": "mock_csi_ribbon",
    "kind": "clear",
    "mm": 19.78,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_leds",
-   "b": "shell_upper",
-   "kind": "clear",
-   "mm": 21.11,
    "status": "PASS"
   },
   {
@@ -797,6 +874,20 @@
    "b": "mock_csi_ribbon",
    "kind": "clear",
    "mm": 21.75,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_laser",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 23.37,
+   "status": "PASS"
+  },
+  {
+   "a": "mock_leds",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 24.8,
    "status": "PASS"
   }
  ],
@@ -858,7 +949,7 @@
   },
   {
    "name": "oled-under-ceiling",
-   "detail": "glass top Z=39.70, ceiling underside Z=41.60 -- 1.90 mm",
+   "detail": "glass top Z=54.50, ceiling underside Z=56.40 -- 1.90 mm",
    "status": "PASS"
   }
  ],
@@ -925,7 +1016,7 @@
   },
   {
    "id": 8,
-   "title": "8 - AS7341 + retainer",
+   "title": "8 - AS7341 on the flip-mount",
    "adds": [
     "mock_as7341",
     "sensor_carrier"
@@ -934,22 +1025,31 @@
   },
   {
    "id": 9,
-   "title": "9 - cartridge in to stop 2",
+   "title": "9 - touch collar + its LEDs",
    "adds": [
-    "mock_cartridge"
+    "touch_collar",
+    "mock_touch_leds"
    ],
    "glb": "step9.glb"
   },
   {
    "id": 10,
-   "title": "10 - upper shell, OLED, windows",
+   "title": "10 - cartridge in to stop 2",
+   "adds": [
+    "mock_cartridge"
+   ],
+   "glb": "step10.glb"
+  },
+  {
+   "id": 11,
+   "title": "11 - upper shell, OLED, windows",
    "adds": [
     "shell_upper",
     "mock_oled",
     "oled_bezel",
-    "mock_ring_window"
+    "mock_touch_window"
    ],
-   "glb": "step10.glb"
+   "glb": "step11.glb"
   }
  ]
 }

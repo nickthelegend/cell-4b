@@ -209,6 +209,39 @@ def optical_head():
     return m
 
 
+TOUCH_COLLAR_Z0 = None      # set below, after the deck thickness is known
+
+
+def touch_collar():
+    """Touch tier: holds the white + IR LEDs at 45 deg / 12 mm aimed UP at the
+    finger, and gives the flipped sensor a clear view of it.
+
+    Ø24 rather than the head's Ø44 for one reason: a 45 deg bore aimed at a
+    spot TOUCH_STANDOFF above only leaves through the SIDE wall if the wall is
+    closer than that. At Ø44 the bores would exit the collar's underside and
+    the LEDs could never be inserted.
+    """
+    # sits above the flip-mount carrier, which clamps the board from on top
+    z0 = S.Z_SENSOR_UP + CARRIER_T + 1.0
+    z1 = S.TOUCH_SPOT_Z - 6.0                          # stops short of the glass
+    R = S.TOUCH_COLLAR_D / 2
+    body = circle(S.TOUCH_COLLAR_D, 96)
+    clear = circle(S.GLASS_D + 2.0, 64)                # the finger's sight line
+
+    bores = [Bore(S.LED_BORE, 0.0, 0.0, S.TOUCH_SPOT_Z,
+                  tilt_deg=180.0 - S.LED_ANGLE, az_deg=az)
+             for az in (S.AZ_TOUCH_W, S.AZ_TOUCH_IR)]
+
+    def profile(z):
+        g = body.difference(clear)
+        for b in bores:
+            g = g.difference(b.section(z))
+        return g
+
+    m = layered(profile, z0, z1, dz=0.35)
+    return m.translate(S.RS_X, S.RS_Y, 0.0)
+
+
 def sensor_deck():
     """Caps the head at Z_SENSOR and carries the AS7341. Separate part so the
     LEDs, laser and camera can all be fitted before it goes on."""
@@ -415,11 +448,18 @@ def shell_upper():
     # --- ceiling, built as bands from the inner face up ------------------
     # The finger well is DEEPER than the dish, so the band order from the
     # inside face out is: ceil0 < z_finger < z_dish < z_bezel < z1.
-    assert ceil0 < z_finger < z_dish < z_bezel < z1, "ceiling bands out of order"
+    assert ceil0 < ceil0 + S.GLASS_REBATE < z_finger < z_dish < z_bezel < z1, \
+        "ceiling bands out of order -- see spec.ENV_Z / CEIL"
 
-    # ceil0 -> z_finger : solid; only the Ø10 ring bore and the OLED window
-    # are open. The ring bore's top lip at z_finger is the window seat.
-    m += prism(inner.difference(ring_bore).difference(oled_win), ceil0, z_finger)
+    # ceil0 -> z_finger : the ring bore is a THROUGH-hole now, exactly as
+    # upstream cuts it -- one optical axis serves the finger above and the
+    # cartridge below. The Ø10.4 x 0.6 rebate at the ceiling's inner face is
+    # where the Ø10 window drops in from underneath, sealing the chamber.
+    glass = circle(S.GLASS_D, 64, S.RS_X, S.RS_Y)
+    m += prism(inner.difference(glass).difference(oled_win),
+               ceil0, ceil0 + S.GLASS_REBATE)
+    m += prism(inner.difference(ring_bore).difference(oled_win),
+               ceil0 + S.GLASS_REBATE, z_finger)
     # z_finger -> z_dish : the Ø14 finger well is open (it bottoms here)
     m += prism(inner.difference(finger).difference(oled_win), z_finger, z_dish)
     # z_dish -> z_bezel : the dish recess opens (the finger well is inside it)
@@ -466,12 +506,24 @@ def oled_bezel():
 # sensor carrier  --  AS7341 board, seats chip-DOWN (blood) or chip-UP (touch)
 # --------------------------------------------------------------------------
 
-CARRIER_T = 1.8
+CARRIER_T = 1.4
 
 
 def sensor_carrier():
-    """Retainer that clamps the AS7341 down onto the sensor deck. It sits ON
-    TOP of the board, so it must be thin enough to stay under the ceiling."""
+    """THE FLIP-MOUNT. One AS7341, one pad, two orientations.
+
+        chip DOWN -> down the relief shaft at the cartridge   (blood tier)
+        chip UP   -> up the ring port at a fingertip          (touch tier)
+
+    It is a frame, not a plate, and it is deliberately SYMMETRIC about its own
+    mid-plane: the same four M2 holes, the same central window, so it clamps
+    the board either way up without a second part. The window is sized to the
+    board's aperture, not to the board, so whichever face the die is on it can
+    see through.
+
+    That symmetry is the whole trick. Without it the touch tier needs a second
+    AS7341 -- another ~2,000 rupees for a board you already own.
+    """
     frame = rounded_rect(S.AS_PCB_L + 5.0, S.AS_PCB_W + 5.0, 2.0)
     window = rounded_rect(S.AS_PCB_L - 6.0, S.AS_PCB_W - 6.0, 1.0)
     holes = unary_union([circle(S.M2_CLEAR, 24,
@@ -487,6 +539,7 @@ PARTS = {
     "aperture_tube": (aperture_tube, "#2E3238", 1),
     "optical_head": (optical_head, "#2E3238", 1),
     "sensor_deck": (sensor_deck, "#2E3238", 1),
+    "touch_collar": (touch_collar, "#3A4048", 1),
     "slot_baffle": (slot_baffle, "#2E3238", 1),
     "window_jig": (window_jig, "#8A9099", 1),
     "shell_lower": (shell_lower, "#3A3F46", 1),

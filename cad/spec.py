@@ -228,7 +228,7 @@ HEATSET_D, HEATSET_L = 3.6, 6.0     # M2.5 brass insert
 
 WALL = 2.4                  # 6 perimeters at 0.4
 FLOOR = 2.4
-CEIL = 2.4
+CEIL = 3.4          # thick enough for rebate + finger well + dish + bezel
 FIT = 0.30                  # generic slip clearance
 PCB_FIT = 0.40              # around a PCB in a recess
 # Lap joint at the part line, NOT a centred tongue-and-groove: a 2.4 wall
@@ -240,9 +240,13 @@ LAP_H = 2.0                 # how far it rises past the part line
 LAP_FIT = 0.15              # clearance between the two
 MIN_WALL = 1.0              # audit fails below this
 
-# ENV_Z 44 (was 42): the AS7341 retainer tops out at 39.2 and the ceiling
-# inner face has to clear it by MIN_CLEAR, not by 0.4 mm.
-ENV_X, ENV_Y, ENV_Z = 92.0, 128.0, 44.0
+# ENV_Z 59 with a 3.4 mm ceiling: the touch tier needs the finger 18.2 mm
+# above the flipped sensor (see TOUCH_STANDOFF) and the window at the
+# ceiling's INNER face, so ENV_Z = TOUCH_SPOT_Z + CEIL. The ceiling also has
+# to carry, in this order from the inside out: the 0.6 glass rebate, the
+# finger well, the dish recess and the bezel recess. At 2.4 they overlapped
+# and one band came out inverted.
+ENV_X, ENV_Y, ENV_Z = 92.0, 128.0, 59.8
 CORNER_R = 5.0
 # The USB stacks are 16.0 mm tall and sit on a PCB at PI_PCB_Z + PI_PCB_T, so
 # their tops reach 23.8. The part line has to sit ABOVE that or the port window
@@ -290,7 +294,42 @@ Z_CAMERA = Z_SAMPLE + CAMERA_H                                         # 23.73
 R_CAMERA = CAMERA_OFFSET_R                                             # 8.00
 
 HEAD_BASE_Z1 = Z_SENSOR                 # = HEAD_TOP, the AS7341 deck
+DECK_T = 2.4                            # sensor deck thickness
 HEAD_TOP = Z_SAMPLE + SENSOR_STANDOFF   # 33.4, the sensor deck
+
+
+# --- TOUCH TIER -------------------------------------------------------------
+# Upstream puts the ring port, the aperture, the sensor and the cartridge well
+# on ONE vertical axis (its DISH_X and SLOT_X are both 28.5) and cuts the port
+# as a THROUGH-hole, so a finger above and a cartridge below share one optical
+# path. What it never draws is how a sensor facing DOWN at a cartridge 9 mm
+# below also sees a finger ABOVE it. One AS7341 aperture cannot do both.
+#
+# CELL-4B resolves it with a FLIP: the same board, the same four screws, the
+# same pad on the sensor deck, mounted either way up.
+#
+#     chip DOWN -> down the relief shaft, reads the cartridge   (blood tier)
+#     chip UP   -> up the ring port, reads a fingertip          (touch tier)
+#
+# The touch side then hits the SAME constraint as the blood side, which is
+# what makes the whole thing coherent: 5 mm LEDs at 45 deg / 12 mm have to
+# clear a 30.5 x 23 board. Below a 16.2 mm standoff their bodies pass straight
+# through it. 18.2 mm clears by 3.4 mm and puts the finger exactly at the
+# ceiling's inner face.
+# 19.0, not the 16.2 minimum: at the minimum the LED bodies' lower outer
+# corners land within 0.1 mm of the flip-mount carrier they have to pass over.
+TOUCH_STANDOFF = 19.0
+# 0/180, not 90/270: the flip-mount's window is 24.5 mm across X and only
+# 17 mm across Y, so LEDs on the Y axis graze its edge. On the X axis they
+# pass through with 1.3 mm to spare.
+AZ_TOUCH_W, AZ_TOUCH_IR = 0.0, 180.0      # opposed, like the blood pair
+TOUCH_COLLAR_D = 24.0                     # so the 45 deg bores exit its SIDE
+GLASS_D, GLASS_REBATE = 10.4, 0.6         # the Ø10 window drops in from below
+# Where the flipped-up sensor's chip face sits, and where the finger goes.
+Z_SENSOR_UP = HEAD_TOP + DECK_T + AS_PCB_T          # 37.4
+TOUCH_SPOT_Z = Z_SENSOR_UP + TOUCH_STANDOFF         # 55.6 = ceiling underside
+R_TOUCH_LED = LED_SLANT * math.sin(math.radians(LED_ANGLE))
+Z_TOUCH_LED = TOUCH_SPOT_Z - LED_SLANT * math.cos(math.radians(LED_ANGLE))
 
 # Top-face dish and ring (the sensor port), upstream's visual language
 DISH_D = 47.2

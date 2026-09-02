@@ -115,6 +115,36 @@ cartridge itself sweeps.
 **in series with the laser module's supply**, not in the GPIO6 gate line. An
 interlock the firmware can talk its way past is not an interlock.
 
+## 3b. Touch tier — the flip-mount
+
+The **same AS7341** serves both tiers. Which one you are building decides which
+way up it goes:
+
+| Tier | Board | Reads |
+|---|---|---|
+| **Blood** | chip **DOWN** on the deck at Z 35.8 | the cartridge, down the relief shaft |
+| **Touch** | chip **UP** at Z 37.4 | a fingertip, up the ring port |
+
+`sensor_carrier` is symmetric — same four M2 holes either way round — so it
+clamps the board in both orientations without a second part.
+
+For touch, add:
+
+1. **`touch_collar`** on top of the carrier. Two 45° bores, inserted from
+   outside:
+   - azimuth **0°** — white LED (this is the red channel)
+   - azimuth **180°** — **940 nm IR**
+   Push each until it bottoms at slant 12, same as the blood LEDs.
+2. **Ø10 × 0.5 window** into the Ø10.4 × 0.6 rebate at the ceiling's **inner**
+   face — it goes in from underneath, and it seals the chamber.
+
+The finger presses on that glass through the ring bore. The port is a
+**through-hole**: one optical axis serves the finger above and the cartridge
+below, which is how upstream cuts it too.
+
+Wire the touch LEDs to their own GPIOs — the blood LEDs point the other way and
+cannot be shared.
+
 ## 4. Upper shell
 
 1. **OLED** on the four posts under the ceiling, glass up to the window.

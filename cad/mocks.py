@@ -251,7 +251,33 @@ def csi_ribbon():
     return m
 
 
+def touch_leds():
+    """White + 940 nm IR in the touch collar, aimed UP at the fingertip.
+
+    Same 45 deg / 12 mm illumination geometry as the blood tier -- the angle
+    is what rejects specular return off skin, exactly as it does off wet blood
+    -- just pointed the other way.
+    """
+    out = Mesh()
+    for az in (S.AZ_TOUCH_W, S.AZ_TOUCH_IR):
+        c = prism(circle(S.LED_BODY_D, 32),
+                  S.LED_SLANT, S.LED_SLANT + S.LED_BODY_L)
+        c.rotate_x(180.0 - S.LED_ANGLE)
+        c.rotate_z(az - 270.0)
+        out += c.translate(S.RS_X, S.RS_Y, S.TOUCH_SPOT_Z)
+    return out
+
+
+def touch_window():
+    """Ø10 x 0.5 glass in the ceiling's rebate -- the finger's contact face."""
+    z = S.ENV_Z - S.CEIL
+    return prism(circle(S.RING_WINDOW_D, 48, S.RS_X, S.RS_Y),
+                 z, z + S.RING_WINDOW_T)
+
+
 MOCKS = {
+    "mock_touch_leds": (touch_leds, "#E8E4D0", 1.0),
+    "mock_touch_window": (touch_window, "#9FD8E8", 0.45),
     "mock_csi_ribbon": (csi_ribbon, "#C8A24A", 1.0),
     "mock_pi4b": (pi4b, "#1E6B4E", 1.0),
     "mock_as7341": (as7341, "#2B6CB0", 1.0),
@@ -259,7 +285,6 @@ MOCKS = {
     "mock_laser": (laser, "#B04A4A", 1.0),
     "mock_leds": (leds, "#E8E4D0", 1.0),
     "mock_oled": (oled, "#1A2A3A", 1.0),
-    "mock_ring_window": (ring_window, "#9FD8E8", 0.45),
     "mock_switch": (switch, "#6B6B6B", 1.0),
     "mock_cartridge": (cartridge_in_place, "#EDF1F5", 1.0),
 }

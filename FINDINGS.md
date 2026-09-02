@@ -209,21 +209,80 @@ Two knock-on fixes fell out of it: the head's mounting posts moved to r = 15 at
 azimuths they fouled the cartridge channel), and the slot baffle gained a notch
 for the switch body, which then fills the notch and keeps it light-tight.
 
-## 8. The ring is decorative in CELL-4B, and the touch tier is not implemented
+## 8. Upstream's touch tier has no drawn optical path — and the fix is a flip
 
-Not an upstream defect — a scope boundary, stated here so nobody expects
-otherwise from the render.
+`BUILD.md` §4 says photoplethysmography happens "through the same ring bore the
+cartridge sits under", and `hardware.py`'s `RealTouchSensor` says it "shares the
+spectrometer head", driving the same white and IR LEDs. Upstream's CAD backs the
+first half of that up exactly:
 
-Upstream's ring is the **touch-tier sensor port**: a fingertip on it is read by
-photoplethysmography through the same bore the cartridge sits under. In
-CELL-4B the ring is a Ø10 window over an empty Ø10 bore. **There are no
-touch-tier optics beneath it.** The AS7341 faces *down* at the sample plane
-28 mm below; nothing looks up at a finger.
+```
+DISH_X = 28.5     ring / dish centre
+SLOT_X = 28.5     cartridge slot centre      ONE AXIS
+```
 
-Implementing touch needs a second sensor station facing up, or the AS7341 moved
-between two mounts. Neither is in this build. What is here is the **blood
-tier** — which is what `BOUNTY.md`'s reader-only partial claim asks for, and
-the half that carries the novel physics.
+and it cuts the port as a **through-hole** — `s.hole(circ(PORT_D, …), top −
+DISH_DEPTH − CEIL − 1.0, top + 1.0)` — so a finger above and a cartridge below
+genuinely share one optical path.
+
+What is never drawn is how the sensor sees both. `build-sheet.svg` labels the
+head **"AS7341 / aperture Ø3.0 × 6.0 / 0° observe"** sitting above the
+cartridge, facing **down**:
+
+| | |
+|---|---|
+| cartridge well | **15.80** — below the sensor ✅ |
+| finger on the glass | **25.72** — **above** it ❌ |
+
+A single AS7341 aperture cannot look both ways, and the three blood LEDs are
+aimed 45° **downward** at a spot 9 mm below the sensor, so neither the emitters
+nor the detector face the finger. The touch tier is specified in prose and in
+firmware, and has no geometry.
+
+### What CELL-4B does: the flip-mount
+
+One board, one pad, two orientations:
+
+```
+chip DOWN  at Z=35.8  ->  down the relief shaft, reads the cartridge
+chip UP    at Z=37.4  ->  up the ring port, reads a fingertip
+```
+
+`sensor_carrier` is deliberately **symmetric** about its own mid-plane — same
+four M2 holes, same central window — so it clamps the board either way up
+without a second part. That symmetry is the whole trick: without it the touch
+tier needs a second AS7341, which is another ~₹2,000 for a board you already
+own.
+
+`touch_collar` carries the white and IR LEDs at the **same 45° / 12 mm** the
+blood tier uses, aimed **up** at the finger. It is Ø24 rather than the head's
+Ø44 for a concrete reason: a 45° bore aimed at a spot above only leaves through
+the **side** wall if the wall is nearer than the standoff. At Ø44 the bores
+would exit the collar's underside and the LEDs could never be inserted.
+
+The port is now a real through-hole with a Ø10.4 × 0.6 rebate at the ceiling's
+inner face, so the Ø10 window drops in from below and seals the chamber —
+exactly as upstream cuts it.
+
+### And it hits the same wall as §1
+
+This is the part worth noticing. The touch side runs into **precisely the
+constraint that breaks upstream's blood side**: 5 mm LEDs at 45° / 12 mm have
+to clear a 30.5 × 23 board.
+
+```
+standoff  9 mm -> LED body ends  -5.57 mm  THROUGH the board
+standoff 14 mm -> LED body ends  -0.57 mm  THROUGH the board
+standoff 16 mm -> LED body ends  +1.43 mm  clears
+standoff 19 mm -> LED body ends  +4.43 mm  clears, and clears the carrier too
+```
+
+Same geometry, same failure, same resolution — a longer standoff. That the
+constraint reappears independently on the other tier is decent evidence §1 is a
+real property of the specified optics and not an artefact of how I built it.
+
+**Cost:** the case grows to 59.8 mm tall, because the finger has to sit 19 mm
+above a sensor that is itself 35.8 mm up.
 
 ## Not changed
 

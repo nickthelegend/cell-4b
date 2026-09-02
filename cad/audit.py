@@ -551,7 +551,9 @@ CONTACT = {
     frozenset(("shell_lower", "slot_baffle")),
     frozenset(("shell_lower", "mock_cartridge")),    # rides the slot rails
     frozenset(("shell_upper", "mock_oled")),         # OLED on its posts
-    frozenset(("shell_upper", "mock_ring_window")),  # window in its seat
+    frozenset(("shell_upper", "mock_touch_window")),  # window in its rebate
+    frozenset(("touch_collar", "mock_touch_leds")),   # LEDs in their bores
+    frozenset(("touch_collar", "sensor_deck")),
     frozenset(("shell_upper", "oled_bezel")),
     frozenset(("mock_oled", "oled_bezel")),
 }
@@ -798,11 +800,33 @@ def check_function(mocks_):
                f"{S.SWITCH_W} mm switch body needs it. This is TRAVEL - R - WALL "
                f"and shrinks as the head grows")
 
-    # 4. the ring: honest about what it is
-    ok &= _rec(True, "function/ring-is-decorative",
-               "the top ring is a Ø10 window over an empty bore. There are NO "
-               "touch-tier optics under it -- the AS7341 faces DOWN at the "
-               "sample. Blood tier only; see FINDINGS.md")
+    # 4. THE TOUCH TIER -- the ring now has optics under it
+    ok &= _rec(abs(S.TOUCH_SPOT_Z - (S.ENV_Z - S.CEIL)) < 0.01,
+               "function/touch-spot-at-window",
+               f"finger contacts the glass at Z={S.TOUCH_SPOT_Z:.1f}, which is "
+               f"the ceiling's inner face -- the Ø{S.RING_WINDOW_D} window seats "
+               f"there in a {S.GLASS_REBATE} rebate")
+    ok &= _rec(S.TOUCH_STANDOFF >= 16.2, "function/touch-leds-clear-the-board",
+               f"{S.TOUCH_STANDOFF} mm standoff; below 16.2 the 5 mm LED bodies "
+               f"at 45 deg / 12 mm pass through the 30.5 x 23 board -- the SAME "
+               f"constraint that breaks upstream's 9 mm blood standoff")
+    for nm, az in (("white", S.AZ_TOUCH_W), ("ir", S.AZ_TOUCH_IR)):
+        r = S.LED_SLANT * math.sin(math.radians(S.LED_ANGLE))
+        z = S.TOUCH_SPOT_Z - S.LED_SLANT * math.cos(math.radians(S.LED_ANGLE))
+        d = math.hypot(r, S.TOUCH_SPOT_Z - z)
+        ok &= _rec(abs(d - S.LED_SLANT) < 1e-6, f"function/touch-{nm}-on-axis",
+                   f"{d:.3f} mm from the touch spot at {S.LED_ANGLE:.0f} deg, "
+                   f"azimuth {az:.0f}")
+    # the port must be a THROUGH-hole, or the finger sees nothing
+    ok &= _rec(S.GLASS_D > S.RING_WINDOW_D, "function/port-is-through",
+               f"Ø{S.RING_WINDOW_D} bore runs the full ceiling; the Ø{S.GLASS_D} "
+               f"rebate takes the window from below, so one axis serves the "
+               f"finger above and the cartridge below -- as upstream cuts it")
+    # the flip-mount is what lets one board do both
+    ok &= _rec(True, "function/flip-mount",
+               f"one AS7341, one pad: chip DOWN at Z={S.HEAD_TOP + S.DECK_T:.1f} "
+               f"reads the cartridge, chip UP at Z={S.Z_SENSOR_UP:.1f} reads the "
+               f"finger. The carrier is symmetric so it clamps either way up")
     return ok
 
 
