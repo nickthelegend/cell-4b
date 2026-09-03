@@ -11,12 +11,19 @@ short of M5 -- that one needs blood, consent and SAFETY.md, not a script.
 """
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 
 from .hw import Bench, InterlockError
 from .spectro import FLOOR, FULL_SCALE, Spectrometer
 
 PASS, FAIL, WARN = "PASS", "FAIL", "WARN"
+
+# Debian keeps i2cdetect in /usr/sbin, which is NOT on a normal user's PATH --
+# so a bare subprocess call for it raises FileNotFoundError on a stock Pi OS
+# and reads like i2c-tools is missing when it is installed and working.
+I2CDETECT = shutil.which("i2cdetect") or "/usr/sbin/i2cdetect"
 
 
 def _line(tag, name, detail=""):
@@ -27,10 +34,17 @@ def _line(tag, name, detail=""):
 def check_i2c() -> str:
     """Both devices answer. 0x39 is the AS7341; 0x3C/0x3D is the OLED."""
     try:
-        out = subprocess.run(["i2cdetect", "-y", "1"], capture_output=True,
+        out = subprocess.run([I2CDETECT, "-y", "1"], capture_output=True,
                              text=True, timeout=10).stdout
+    except FileNotFoundError:
+        return _line(FAIL, "I2C bus", "i2c-tools not installed "
+                     "(sudo apt install i2c-tools)")
     except Exception as e:
         return _line(FAIL, "I2C bus", f"i2cdetect failed: {e}")
+    if not os.path.exists("/dev/i2c-1"):
+        return _line(FAIL, "I2C bus", "/dev/i2c-1 does not exist -- the bus is "
+                     "not enabled. sudo raspi-config nonint do_i2c 0, "
+                     "then reboot.")
     found = "39" in out
     oled = ("3c" in out) or ("3d" in out)
     if not found:
