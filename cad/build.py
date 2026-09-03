@@ -71,16 +71,31 @@ PLATES = [
 ]
 
 
-def for_print(name, mesh):
-    """Lay a part flat at the origin in its print orientation."""
+# Extra volumes welded to a plate item: {item_name: [(vol_name, mesh, filament)]}.
+# Filament 2 is the lettering; everything unlisted prints on filament 1.
+EXTRA_VOLS = {}
+
+
+def for_print(name, mesh, companions=()):
+    """Lay a part flat at the origin in its print orientation.
+
+    `companions` ride along on the SAME transform -- a colour inlay has to
+    follow its shell through the flip and the centring, not be re-centred on
+    its own bounds, or it lands somewhere else entirely.
+    """
     m = mesh.copy()
+    cs = [c.copy() for c in companions]
     if ORIENT.get(name) == "flipx":
         lo, hi = m.bbox()
-        m.rotate_x(180.0, about=(float((lo[1] + hi[1]) / 2),
-                                 float((lo[2] + hi[2]) / 2)))
+        about = (float((lo[1] + hi[1]) / 2), float((lo[2] + hi[2]) / 2))
+        m.rotate_x(180.0, about=about)
+        for c in cs:
+            c.rotate_x(180.0, about=about)
     lo, hi = m.bbox()
-    return m.translate(-float((lo[0] + hi[0]) / 2),
-                       -float((lo[1] + hi[1]) / 2), -float(lo[2]))
+    d = (-float((lo[0] + hi[0]) / 2), -float((lo[1] + hi[1]) / 2), -float(lo[2]))
+    m = m.translate(*d)
+    cs = [c.translate(*d) for c in cs]
+    return (m, cs) if companions else m
 
 
 def pack(items, gap=4.0):
@@ -97,8 +112,11 @@ def pack(items, gap=4.0):
             row_h = 0.0
         c = m.copy()
         lo, _ = c.bbox()
-        c.translate(x - float(lo[0]), y - float(lo[1]), 0.0)
-        placed.append((nm, c))
+        dx, dy = x - float(lo[0]), y - float(lo[1])
+        c.translate(dx, dy, 0.0)
+        extra = [(vn, vm.copy().translate(dx, dy, 0.0), ex)
+                 for vn, vm, ex in EXTRA_VOLS.get(nm, [])]
+        placed.append((nm, c, extra) if extra else (nm, c))
         x += w + gap
         row_h = max(row_h, h)
     return placed, y + row_h
@@ -140,6 +158,13 @@ def main():
     # ---- STLs, in print orientation -------------------------------------
     print("\nwriting STLs ...")
     printed = {}
+    # The lettering inlays fill the recesses flush and print in filament 2.
+    # They ride each shell's own transform -- centred on their own bounds they
+    # would land somewhere else entirely.
+    for _base, _vn, _im in (("shell_lower", "wordmark_front", P.brand_front_inlay()),
+                            ("shell_upper", "wordmark_top", P.brand_top_inlay())):
+        _, _cs = for_print(_base, parts[_base], [_im])
+        EXTRA_VOLS[f"{_base}_1"] = [(_vn, _cs[0], 2)]
     for name, m in parts.items():
         pm = for_print(name, m)
         printed[name] = pm
@@ -264,11 +289,15 @@ def main():
             counts[n] = counts.get(n, 0) + 1
             items.append((f"{n}_{counts[n]}", printed[n]))
         placed, depth = pack(items)
-        w = max(float(m.bbox()[1][0]) for _, m in placed)
-        pl.glb_write(os.path.join(GLB, f"plate{i}.glb"),
-                     [(n, m, P.PARTS[n.rsplit('_', 1)[0]][1], 1.0)
-                      for n, m in placed])
-        threemf.write(os.path.join(OUT, f"plate{i}.3mf"), placed)
+        flat = [(t[0], t[1], (t[2] if len(t) > 2 else [])) for t in placed]
+        w = max(float(m.bbox()[1][0]) for _, m, _ in flat)
+        glb = []
+        for n, m, extra in flat:
+            glb.append((n, m, P.PARTS[n.rsplit('_', 1)[0]][1], 1.0))
+            glb.extend((vn, vm, "#D02020", 1.0) for vn, vm, _ in extra)
+        pl.glb_write(os.path.join(GLB, f"plate{i}.glb"), glb)
+        threemf.write(os.path.join(OUT, f"plate{i}.3mf"),
+                      [(n, [(n, m, 1)] + list(extra)) for n, m, extra in flat])
         fits = w <= S.PLATE_MAX and depth <= S.PLATE_MAX
         manifest["plates"].append({
             "id": i, "title": title, "parts": counts,

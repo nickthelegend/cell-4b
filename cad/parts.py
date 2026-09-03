@@ -85,6 +85,52 @@ def _front_mark_cut(z):
     return unary_union(parts) if parts else None
 
 
+def _front_mark_fill(z):
+    """The wordmark's slice at z, as the SOLID that fills the recess.
+
+    The mirror of _front_mark_cut: same slice, but bounded at the face
+    instead of running 1 mm proud of it, so it fills the recess and stops
+    flush rather than standing on the wall.
+    """
+    x0, mz0, x1, mz1 = _BRAND_FRONT_BOX
+    if not (mz0 <= z <= mz1):
+        return None
+    sl = _BRAND_FRONT_G.intersection(box(x0 - 1.0, z - 0.02, x1 + 1.0, z + 0.02))
+    if sl.is_empty:
+        return None
+    yf = -S.ENV_Y / 2
+    parts = []
+    for g in (sl.geoms if hasattr(sl, "geoms") else [sl]):
+        if g.is_empty:
+            continue
+        gx0, _, gx1, _ = g.bounds
+        parts.append(box(gx0, yf, gx1, yf + S.BRAND_DEPTH))
+    return unary_union(parts) if parts else None
+
+
+def brand_front_inlay():
+    """Second-colour solid filling the front wordmark recess, flush.
+
+    Built on the SAME 0.2 mm ladder as the cut, evaluated at the same layer
+    midpoints, so it fills the recess exactly -- no gap for the slicer to
+    bridge and no interference for it to resolve.
+    """
+    mz0, mz1 = _BRAND_FRONT_BOX[1] - 0.3, _BRAND_FRONT_BOX[3] + 0.3
+    return pl.layered(_front_mark_fill, mz0, mz1, dz=0.2)
+
+
+def brand_top_inlay():
+    """Second-colour solid filling the top line's recess, flush.
+
+    A plain X-Y extrusion: the ceiling recess is one too, so this is simply
+    the same polygon over the same BRAND_DEPTH.
+    """
+    brand = LT.text_polygon(S.BRAND_TOP, S.BRAND_TOP_CAP,
+                            stroke=S.BRAND_STROKE_TOP,
+                            cx=0.0, cy=S.BRAND_TOP_Y)
+    return pl.prism(brand, S.ENV_Z - S.BRAND_DEPTH, S.ENV_Z)
+
+
 def _screw_column(x, y, od, hole_d, z0, z1, hz0=None, hz1=None):
     """Boss with an axial hole. Returns a Mesh."""
     hz0 = z0 if hz0 is None else hz0
