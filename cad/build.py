@@ -18,6 +18,7 @@ import audit
 import mocks as M
 import partlib as pl
 import parts as P
+import threemf
 import spec as S
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -267,6 +268,7 @@ def main():
         pl.glb_write(os.path.join(GLB, f"plate{i}.glb"),
                      [(n, m, P.PARTS[n.rsplit('_', 1)[0]][1], 1.0)
                       for n, m in placed])
+        threemf.write(os.path.join(OUT, f"plate{i}.3mf"), placed)
         fits = w <= S.PLATE_MAX and depth <= S.PLATE_MAX
         manifest["plates"].append({
             "id": i, "title": title, "parts": counts,
