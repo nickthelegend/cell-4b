@@ -976,6 +976,69 @@ def check_screws():
     return ok
 
 
+def check_markings(meshes):
+    """The wordmarks must be recesses, not holes, and must land on real face.
+
+    A mark is the easiest way to put a through-hole in a light-tight box by
+    accident: nudge it onto a vent, a window or the dish and the "recess" opens
+    straight into the chamber. So rather than trust the coordinates, this
+    samples INSIDE each letter and asserts there is still material behind the
+    floor of the recess.
+    """
+    import lettering as LT
+    ok = True
+
+    ok &= _rec(S.BRAND_DEPTH < S.WALL, "light/mark-depth-front",
+               f"{S.BRAND_DEPTH} mm into a {S.WALL} mm wall -- "
+               f"{S.WALL - S.BRAND_DEPTH:.1f} mm of material behind")
+    ok &= _rec(S.BRAND_DEPTH < S.CEIL, "light/mark-depth-top",
+               f"{S.BRAND_DEPTH} mm into a {S.CEIL} mm ceiling")
+    for nm, w in (("front", S.BRAND_STROKE), ("top", S.BRAND_STROKE_TOP)):
+        ok &= _rec(w >= S.BRAND_STROKE_MIN, f"mark/{nm}-stroke",
+                   f"{w} mm groove (floor {S.BRAND_STROKE_MIN}) -- "
+                   f"{w / 0.4:.1f} extrusions wide")
+    for nm, txt in (("front", S.BRAND_FRONT), ("top", S.BRAND_TOP)):
+        ok &= _rec(not LT.missing(txt), f"mark/{nm}-glyphs",
+                   f"{txt!r} -> missing {LT.missing(txt)}" if LT.missing(txt)
+                   else f"{txt!r} all drawn")
+
+    def _pts_in(poly, step=0.7):
+        x0, y0, x1, y1 = poly.bounds
+        out = []
+        yy = y0 + step / 2
+        while yy < y1:
+            xx = x0 + step / 2
+            while xx < x1:
+                if poly.contains(SPoint(xx, yy)):
+                    out.append((xx, yy))
+                xx += step
+            yy += step
+        return out
+
+    from shapely.geometry import Point as SPoint
+
+    # FRONT: material must remain behind the recess floor
+    fg = LT.text_polygon(S.BRAND_FRONT, S.BRAND_FRONT_CAP,
+                         stroke=S.BRAND_STROKE, cx=0.0, cy=S.BRAND_FRONT_Z)
+    y_behind = -S.ENV_Y / 2 + S.BRAND_DEPTH + 0.4
+    pts = np.array([(x, y_behind, z) for x, z in _pts_in(fg)])
+    solid = _inside(meshes["shell_lower"], pts)
+    ok &= _rec(bool(solid.all()), "mark/front-backed-by-wall",
+               f"{int((~solid).sum())} of {len(pts)} points inside the wordmark "
+               f"have NO wall behind them at y={y_behind:.2f}")
+
+    # TOP: same, under the top line
+    tg = LT.text_polygon(S.BRAND_TOP, S.BRAND_TOP_CAP,
+                         stroke=S.BRAND_STROKE_TOP, cx=0.0, cy=S.BRAND_TOP_Y)
+    z_under = S.ENV_Z - S.BRAND_DEPTH - 0.4
+    pts = np.array([(x, y, z_under) for x, y in _pts_in(tg)])
+    solid = _inside(meshes["shell_upper"], pts)
+    ok &= _rec(bool(solid.all()), "mark/top-backed-by-ceiling",
+               f"{int((~solid).sum())} of {len(pts)} points inside the top line "
+               f"have NO ceiling under them at Z={z_under:.2f}")
+    return ok
+
+
 def check_connected(meshes):
     """Every printed part must come out as ONE connected shell.
 
@@ -1244,6 +1307,7 @@ def run(meshes=None, sampled=True):
         check_function(mk)
         check_slot_light(mk)
         check_interference(meshes, mk)
+        check_markings(meshes)
         check_connected(meshes)
         check_plates(meshes)
         check_corridor(meshes)

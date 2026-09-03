@@ -356,6 +356,33 @@ BOSS_XY = [(-38.0, -58.0), (38.0, -58.0),
 VENT_DEPTH = 1.2
 VENT_W, VENT_L = 2.0, 14.0
 
+# --- markings ---------------------------------------------------------------
+# Both are DEBOSSED, for two different reasons.
+#
+# Front: a raised wordmark would stand proud of the envelope and be the first
+# thing to scuff. Recessed, it also takes a wipe of paint if you want contrast.
+#
+# Top: shell_upper prints "flipx" -- the ceiling goes face-DOWN on the bed. A
+# raised mark there would make the whole lid stand on its own lettering, with
+# the rest of the face floating a fraction above the plate. Recessed, the face
+# lies flat and the letters come out crisp off the smooth sheet.
+#
+# Depth is bounded by the wall it is cut into, and audit.check_markings()
+# enforces that -- a mark that breaks through is a light leak, and G1 depends
+# on the chamber being dark.
+BRAND_FRONT = "CELL-4B"
+BRAND_TOP = "PROOF OF LIFE"
+BRAND_DEPTH = 0.6                       # << WALL (2.4) and << CEIL (3.4)
+BRAND_FRONT_CAP = 11.0                  # cap height, front wordmark
+BRAND_FRONT_Z = 15.5                    # centre height on the front face
+BRAND_TOP_CAP = 6.0                     # cap height, top line
+BRAND_TOP_Y = 0.0                       # centre, in the band between dish and vents
+# A groove narrower than a couple of extrusions prints as a smear, so the
+# stroke is set in millimetres rather than scaled off the cap height.
+BRAND_STROKE = 1.4                      # front
+BRAND_STROKE_TOP = 0.9                  # top
+BRAND_STROKE_MIN = 0.8                  # printability floor, checked
+
 PLATE_MAX = 250.0           # Bambu P1S usable bed, with margin off 256
 
 # --- CSI ribbon route -------------------------------------------------------

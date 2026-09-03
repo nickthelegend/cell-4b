@@ -38,6 +38,32 @@ def surface_points(mesh, n=600, seed=0):
     return P
 
 
+def interior_points(mesh, inside_fn, n=400, seed=0, eps=0.02):
+    """Points strictly INSIDE `mesh`, offset off its own surface.
+
+    Surface points are useless for deciding overlap when two parts share a
+    face: "inside" is undefined on the boundary, and the ray test settles it by
+    a parity that a coincident face makes arbitrary. So step off the surface
+    along each triangle's own normal -- whichever way is into the solid -- and
+    ask the question somewhere it has an answer.
+    """
+    V, F = mesh._np()
+    tri = V[F]
+    c = tri.mean(axis=1)
+    nrm = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+    L = np.linalg.norm(nrm, axis=1)
+    L[L < 1e-12] = 1.0
+    nrm = nrm / L[:, None]
+    if len(c) > n:
+        rng = np.random.default_rng(seed)
+        idx = rng.choice(len(c), n, replace=False)
+        c, nrm = c[idx], nrm[idx]
+    plus, minus = c + nrm * eps, c - nrm * eps
+    take_plus = inside_fn(mesh, plus)
+    Q = np.where(take_plus[:, None], plus, minus)
+    return Q[inside_fn(mesh, Q)]
+
+
 def _pt_tri_dist2(P, tri):
     """Squared distance from each point in P (m,3) to each triangle (k,3,3).
 
@@ -167,7 +193,16 @@ def penetration(a, b, inside_fn, n=400, tol=0.15):
         return 0.0, 0
     worst, count = 0.0, 0
     for src, dst, seed in ((a, b, 2), (b, a, 3)):
-        P = surface_points(src, n, seed)
+        # interior points, not surface points -- see interior_points(). Two
+        # parts that merely touch share no interior, so contact drops out
+        # without needing to be whitelisted.
+        # eps is deliberately TINY: it only has to escape exact coplanarity,
+        # not set the sensitivity. `tol` below is what decides how shallow an
+        # overlap counts, and stepping in by tol here would double that
+        # threshold silently.
+        P = interior_points(src, inside_fn, n, seed)
+        if not len(P):
+            continue
         ins = inside_fn(dst, P)
         if not ins.any():
             continue

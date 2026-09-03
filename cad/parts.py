@@ -12,6 +12,7 @@ from shapely.geometry import box
 from shapely.ops import unary_union
 
 import bodies as BD
+import lettering as LT
 import partlib as pl
 from partlib import Bore, Mesh, circle, ellipse, layered, prism, rounded_rect
 import spec as S
@@ -48,6 +49,40 @@ def lap_lower():
 def lap_upper():
     """Upper shell over the lap: the outer band, clear of the tongue."""
     return _env().difference(_env(S.WALL - S.LAP_INNER - S.LAP_FIT))
+
+
+# --------------------------------------------------------------------------
+# front wordmark
+#
+# The mark lives in the X-Z plane, but this kernel only extrudes X-Y profiles
+# along Z, and it has no CSG -- so the recess cannot be a solid subtracted from
+# the wall. Instead the wall is already built by layered(), and each layer
+# subtracts the wordmark's HORIZONTAL SLICE at that height. Cut finely enough
+# and the stack is the letterform.
+# --------------------------------------------------------------------------
+
+_BRAND_FRONT_G = LT.text_polygon(S.BRAND_FRONT, S.BRAND_FRONT_CAP,
+                                 stroke=S.BRAND_STROKE,
+                                 cx=0.0, cy=S.BRAND_FRONT_Z)
+_BRAND_FRONT_BOX = _BRAND_FRONT_G.bounds        # (x0, z0, x1, z1)
+
+
+def _front_mark_cut(z):
+    """The wordmark's slice at height z, as a cut into the FRONT wall."""
+    x0, mz0, x1, mz1 = _BRAND_FRONT_BOX
+    if not (mz0 <= z <= mz1):
+        return None
+    sl = _BRAND_FRONT_G.intersection(box(x0 - 1.0, z - 0.02, x1 + 1.0, z + 0.02))
+    if sl.is_empty:
+        return None
+    yf = -S.ENV_Y / 2
+    parts = []
+    for g in (sl.geoms if hasattr(sl, "geoms") else [sl]):
+        if g.is_empty:
+            continue
+        gx0, _, gx1, _ = g.bounds
+        parts.append(box(gx0, yf - 1.0, gx1, yf + S.BRAND_DEPTH))
+    return unary_union(parts) if parts else None
 
 
 def _screw_column(x, y, od, hole_d, z0, z1, hz0=None, hz1=None):
@@ -405,11 +440,19 @@ def shell_lower():
             _, cy = S.pi_to_case(0.0, S.PI_SD_CY)
             cuts.append(box(S.ENV_X / 2 - S.WALL - 1, cy - S.PI_SD_W / 2,
                             S.ENV_X / 2 + 1, cy + S.PI_SD_W / 2))
+        mark = _front_mark_cut(z)
+        if mark is not None:
+            cuts.append(mark)
         if cuts:
             g = g.difference(unary_union(cuts))
         return g
 
-    m += layered(wall_profile, S.FLOOR, S.PART_LINE_Z, dz=0.5)
+    # The wordmark band is stepped finely -- at the wall's ordinary 0.5 mm the
+    # round terminals of C, B and 4 read as a staircase.
+    mz0, mz1 = _BRAND_FRONT_BOX[1] - 0.3, _BRAND_FRONT_BOX[3] + 0.3
+    m += layered(wall_profile, S.FLOOR, mz0, dz=0.5)
+    m += layered(wall_profile, mz0, mz1, dz=0.2)
+    m += layered(wall_profile, mz1, S.PART_LINE_Z, dz=0.5)
 
     # --- lap joint: the lower shell's tongue is the INNER LAP_INNER of the
     # wall, so nothing at the joint is thinner than LAP_INNER.
@@ -528,8 +571,16 @@ def shell_upper():
     # z_dish -> z_bezel : the dish recess opens (the finger well is inside it)
     m += prism(inner.difference(dish).difference(oled_win), z_dish, z_bezel)
     # z_bezel -> z1 : the bezel recess and the blind vents open at the top face
-    m += prism(inner.difference(dish).difference(bezel_recess)
-               .difference(vent_g), z_bezel, z1)
+    # z_bezel -> z1 : split, so the last BRAND_DEPTH carries the top line.
+    # Straight 2D subtraction here -- the ceiling is an X-Y extrusion, so the
+    # lettering is already in the right plane (unlike the front wordmark).
+    top = inner.difference(dish).difference(bezel_recess).difference(vent_g)
+    brand = LT.text_polygon(S.BRAND_TOP, S.BRAND_TOP_CAP,
+                            stroke=S.BRAND_STROKE_TOP,
+                            cx=0.0, cy=S.BRAND_TOP_Y)
+    z_mark = z1 - S.BRAND_DEPTH
+    m += prism(top, z_bezel, z_mark)
+    m += prism(top.difference(brand), z_mark, z1)
     # tick ridges standing proud of the dish floor
     m += prism(tick_g.difference(finger), z_dish, z_dish + 0.4)
     # the ring: a collar around the finger well, standing on the dish floor

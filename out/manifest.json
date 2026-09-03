@@ -147,8 +147,8 @@
   {
    "name": "shell_lower",
    "qty": 1,
-   "triangles": 27404,
-   "volume_mm3": 54886.16,
+   "triangles": 52564,
+   "volume_mm3": 55382.22,
    "watertight": true,
    "bbox": [
     92.0,
@@ -163,8 +163,8 @@
   {
    "name": "shell_upper",
    "qty": 1,
-   "triangles": 9700,
-   "volume_mm3": 65136.27,
+   "triangles": 14260,
+   "volume_mm3": 65056.95,
    "watertight": true,
    "bbox": [
     92.0,
@@ -389,7 +389,7 @@
   }
  ],
  "audit": {
-  "checks": 411,
+  "checks": 419,
   "failed": 0
  },
  "gaps": [
@@ -789,7 +789,7 @@
    "a": "mock_touch_leds",
    "b": "shell_upper",
    "kind": "clear",
-   "mm": 8.43,
+   "mm": 8.9,
    "status": "PASS"
   },
   {
@@ -817,14 +817,21 @@
    "a": "mock_laser",
    "b": "shell_lower",
    "kind": "clear",
-   "mm": 15.19,
+   "mm": 14.89,
    "status": "PASS"
   },
   {
    "a": "mock_leds",
    "b": "shell_lower",
    "kind": "clear",
-   "mm": 16.28,
+   "mm": 16.81,
+   "status": "PASS"
+  },
+  {
+   "a": "sensor_carrier",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 17.26,
    "status": "PASS"
   },
   {
@@ -832,20 +839,6 @@
    "b": "mock_touch_leds",
    "kind": "clear",
    "mm": 17.51,
-   "status": "PASS"
-  },
-  {
-   "a": "sensor_carrier",
-   "b": "shell_upper",
-   "kind": "clear",
-   "mm": 17.6,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_camera",
-   "b": "shell_upper",
-   "kind": "clear",
-   "mm": 18.35,
    "status": "PASS"
   },
   {
@@ -870,6 +863,13 @@
    "status": "PASS"
   },
   {
+   "a": "mock_camera",
+   "b": "shell_upper",
+   "kind": "clear",
+   "mm": 21.74,
+   "status": "PASS"
+  },
+  {
    "a": "mock_cartridge",
    "b": "mock_csi_ribbon",
    "kind": "clear",
@@ -880,14 +880,14 @@
    "a": "mock_laser",
    "b": "shell_upper",
    "kind": "clear",
-   "mm": 23.37,
+   "mm": 23.31,
    "status": "PASS"
   },
   {
    "a": "mock_leds",
    "b": "shell_upper",
    "kind": "clear",
-   "mm": 24.8,
+   "mm": 27.29,
    "status": "PASS"
   }
  ],
