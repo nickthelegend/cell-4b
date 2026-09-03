@@ -384,6 +384,11 @@ BRAND_STROKE_TOP = 0.9                  # top
 BRAND_STROKE_MIN = 0.8                  # printability floor, checked
 
 PLATE_MAX = 250.0           # Bambu P1S usable bed, with margin off 256
+# Gap between parts on a plate. Not model clearance -- BRIM clearance: at 4 mm
+# Bambu reported "conflicts of gcode paths at layer 1" between the two shells,
+# because an auto brim is ~5 mm a side and theirs overlapped. 12 mm clears two
+# brims plus margin, and still packs inside PLATE_MAX.
+PLATE_GAP = 12.0
 
 # --- CSI ribbon route -------------------------------------------------------
 # The camera sits at 20 mm from the read spot, which is r = 14.14 -- INSIDE the

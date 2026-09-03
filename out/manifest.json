@@ -226,8 +226,8 @@
     "window_jig": 1
    },
    "extent": [
-    246.5,
-    195.7
+    243.5,
+    237.3
    ],
    "fits_p1s": true,
    "glb": "plate1.glb"
@@ -242,7 +242,7 @@
    },
    "extent": [
     248.0,
-    106.0
+    177.0
    ],
    "fits_p1s": true,
    "glb": "plate2.glb"

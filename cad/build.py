@@ -98,8 +98,9 @@ def for_print(name, mesh, companions=()):
     return (m, cs) if companions else m
 
 
-def pack(items, gap=4.0):
+def pack(items, gap=None):
     """Shelf-pack (name, mesh) onto a PLATE_MAX bed. Returns placed meshes."""
+    gap = S.PLATE_GAP if gap is None else gap
     sized = []
     for nm, m in items:
         lo, hi = m.bbox()
