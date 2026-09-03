@@ -1,0 +1,6 @@
+# Pi OS Bookworm ships gpiozero and picamera2 as system packages -- install
+# those with apt, not pip, or you get a second copy that cannot see the
+# hardware. These are the ones that genuinely need pip.
+adafruit-blinka>=8.0
+adafruit-circuitpython-as7341>=1.0
+luma.oled>=3.12
