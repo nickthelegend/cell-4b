@@ -63,6 +63,11 @@ def check_interlock() -> str:
     A pass here means the SOFTWARE interlock works; it says nothing about the
     hardware one through the microswitch, which you verify with a meter.
     """
+    from .hw import LASER_FITTED
+    if not LASER_FITTED:
+        return _line(WARN, "laser interlock",
+                     "no laser driver fitted -- nothing to interlock yet. "
+                     "M2-M5 do not need it; M6 speckle does.")
     with Bench() as b:
         if b.seated:
             return _line(WARN, "laser interlock",
@@ -109,9 +114,12 @@ def check_emitters() -> str:
                 bad.append(name)
         detail = ", ".join(rows) + f" (dark {dark})"
         if bad:
+            from .hw import EMITTER_SINK
+            hint = ("polarity (sink build: LOW is lit), the resistor, and "
+                    "which rail it went to" if EMITTER_SINK else
+                    "the FET, the resistor, and which rail it went to")
             return _line(FAIL, "emitters", detail +
-                         f" -- no response from {', '.join(bad)}: check the "
-                         "FET, the resistor, and which rail it went to")
+                         f" -- no response from {', '.join(bad)}: check " + hint)
         return _line(PASS, "emitters", detail)
 
 

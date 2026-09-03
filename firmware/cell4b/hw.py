@@ -21,6 +21,28 @@ from contextlib import contextmanager
 
 from gpiozero import DigitalOutputDevice, Button
 
+# --- how the emitters are wired -------------------------------------------
+# Two topologies, and this flag MUST match the solder joints -- get it wrong
+# and every emitter is lit exactly when it should be dark.
+#
+#   SINK (no transistors):  +V -> R -> LED -> GPIO.  The pin sinks the current;
+#       pin LOW = lit. A GPIO sources only 3.3 V, which cannot light a 3.1 V
+#       white LED, but it can SINK one running off the 5 V rail.
+#
+#   SOURCE (2N7000 / BJT):  GPIO -> gate/base, transistor in the ground return;
+#       pin HIGH = lit.
+#
+# The sink build is safe on a floating pin -- during boot GPIOs are inputs, and
+# the LED stops conducting once the pin reaches (rail - Vf), so a white on +5 V
+# can pull a pad no higher than 1.90 V. That is WHY the 940 nm stays on +3V3:
+# from 5 V its 1.35 V Vf would let the pin float to 3.65 V, over the 3.3 V pad
+# limit. Never move the IR to the 5 V rail in a sink build.
+EMITTER_SINK = True
+
+# The laser needs 20-40 mA, far past a pin's 16 mA, so it cannot be sunk and
+# always needs a real switch. False makes laser() say so instead of pretending.
+LASER_FITTED = False
+
 # --- ASSEMBLY.md section 5 -------------------------------------------------
 PIN_WHITE_1 = 12
 PIN_WHITE_2 = 16          # CELL-4B's addition; upstream drove this from the
@@ -44,9 +66,16 @@ class Bench:
 
     def __init__(self, settle: float = 0.05):
         self.settle = settle
-        self.white_1 = DigitalOutputDevice(PIN_WHITE_1, initial_value=False)
-        self.white_2 = DigitalOutputDevice(PIN_WHITE_2, initial_value=False)
-        self.ir_940 = DigitalOutputDevice(PIN_IR_940, initial_value=False)
+        # active_high mirrors the wiring: in a sink build "lit" is a LOW pin.
+        # gpiozero handles the inversion, so .on() still means lit either way.
+        hi = not EMITTER_SINK
+        self.white_1 = DigitalOutputDevice(PIN_WHITE_1, active_high=hi,
+                                           initial_value=False)
+        self.white_2 = DigitalOutputDevice(PIN_WHITE_2, active_high=hi,
+                                           initial_value=False)
+        self.ir_940 = DigitalOutputDevice(PIN_IR_940, active_high=hi,
+                                          initial_value=False)
+        # The laser gate is always a real transistor, so always active-high.
         self._laser = DigitalOutputDevice(PIN_LASER, initial_value=False)
         # pull_up=True matches the switch wiring: LOW == seated, so
         # is_pressed reads True exactly when a cartridge is in.
@@ -100,6 +129,12 @@ class Bench:
         open, and is deliberately awkward to reach: you have to pass it, and
         the caller that does should say why.
         """
+        if not LASER_FITTED:
+            raise InterlockError(
+                "no laser driver fitted (hw.LASER_FITTED is False). The 650 nm "
+                "module needs 20-40 mA, well past a GPIO's 16 mA, so it cannot "
+                "be sunk like the LEDs -- it needs a transistor. Everything up "
+                "to M5 runs without it; only M6 speckle needs the laser.")
         if require_seated and not self.seated:
             raise InterlockError(
                 "no cartridge seated (GPIO22 high) -- laser refused. "
