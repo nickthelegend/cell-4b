@@ -59,9 +59,18 @@ class Reading:
 class Spectrometer:
     """The AS7341 at 0x39, with defaults for a 28 mm standoff."""
 
-    # ATIME 99 / ASTEP 999 is ~278 ms: long, deliberately. At 28 mm the short
-    # integrations in upstream's examples put 415 nm on the floor.
-    def __init__(self, atime: int = 99, astep: int = 999, gain: int = 8):
+    # ATIME 99 / ASTEP 1799 is ~500 ms: long, deliberately, and for two
+    # independent reasons that stack.
+    #
+    #   1. The sensor is at 28 mm, not upstream's 9 mm -- about 9.7x less light.
+    #   2. This build runs 120 ohm emitter resistors rather than the 68/47 the
+    #      design calls for, which is 15.0 mA into the whites (59% of design)
+    #      and 15.4 mA into the 940 nm (43%).
+    #
+    # (2) alone wants 1.7x more integration for the whites, so 278 ms became
+    # 500 ms. If you fit the design resistors later this can go back down --
+    # but verify with headroom() rather than assuming, in either direction.
+    def __init__(self, atime: int = 99, astep: int = 1799, gain: int = 8):
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.dev = AS7341(self.i2c, address=I2C_ADDR)
         self.set_timing(atime, astep, gain)
