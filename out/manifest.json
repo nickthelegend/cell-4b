@@ -212,34 +212,10 @@
  "plates": [
   {
    "id": 1,
-   "title": "Plate 1 - shell lower",
+   "title": "Plate 1 - case + optics",
    "parts": {
-    "shell_lower": 1
-   },
-   "extent": [
-    92.0,
-    128.0
-   ],
-   "fits_p1s": true,
-   "glb": "plate1.glb"
-  },
-  {
-   "id": 2,
-   "title": "Plate 2 - shell upper",
-   "parts": {
-    "shell_upper": 1
-   },
-   "extent": [
-    92.0,
-    128.0
-   ],
-   "fits_p1s": true,
-   "glb": "plate2.glb"
-  },
-  {
-   "id": 3,
-   "title": "Plate 3 - optics + small parts",
-   "parts": {
+    "shell_lower": 1,
+    "shell_upper": 1,
     "optical_head": 1,
     "sensor_deck": 1,
     "touch_collar": 1,
@@ -250,15 +226,15 @@
     "window_jig": 1
    },
    "extent": [
-    219.5,
-    89.3
+    246.5,
+    195.7
    ],
    "fits_p1s": true,
-   "glb": "plate3.glb"
+   "glb": "plate1.glb"
   },
   {
-   "id": 4,
-   "title": "Plate 4 - cartridges",
+   "id": 2,
+   "title": "Plate 2 - cartridges",
    "parts": {
     "cartridge": 20,
     "cartridge_reference": 1,
@@ -269,7 +245,7 @@
     106.0
    ],
    "fits_p1s": true,
-   "glb": "plate4.glb"
+   "glb": "plate2.glb"
   }
  ],
  "spec": {

@@ -55,12 +55,17 @@ PRINT_SETTINGS = {
 }
 
 PLATES = [
-    ("Plate 1 - shell lower", ["shell_lower"]),
-    ("Plate 2 - shell upper", ["shell_upper"]),
-    ("Plate 3 - optics + small parts",
-     ["optical_head", "sensor_deck", "touch_collar", "aperture_tube",
+    # One case plate. The P1S bed is 256 mm and these pack to well under it, so
+    # the shells and every small part go down in a single run rather than three.
+    # They do NOT share a process: the shells are 0.16 mm and the optics 0.12 mm,
+    # so this plate needs per-object layer heights in the slicer -- see MANIFEST.
+    ("Plate 1 - case + optics",
+     ["shell_lower", "shell_upper",
+      "optical_head", "sensor_deck", "touch_collar", "aperture_tube",
       "slot_baffle", "oled_bezel", "sensor_carrier", "window_jig"]),
-    ("Plate 4 - cartridges",
+    # Cartridges stay on their own plate. They are the one part with ironing on,
+    # and they are consumable -- you reprint these without touching the case.
+    ("Plate 2 - cartridges",
      ["cartridge"] * 20 + ["cartridge_reference", "cartridge_null"]),
 ]
 
