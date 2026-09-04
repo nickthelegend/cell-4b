@@ -1,0 +1,65 @@
+<!doctype html><meta charset="utf-8"><title>bridge end to end</title>
+<style>body{font:13px/1.6 ui-monospace,Menlo,monospace;background:#0f1318;color:#e6ebf2;padding:22px}
+.ok{color:#5fd39a}.bad{color:#f08a7a}pre{white-space:pre-wrap}</style>
+<pre id="o">running…</pre>
+<script type="module">
+import * as wire from "./extension/lib/wire.js";
+import { encodeQR } from "./extension/lib/qr.js";
+import { toChecksumAddress } from "./extension/lib/keccak.js";
+const o = document.getElementById("o"); o.textContent = "";
+const say = (m, c) => o.innerHTML += `<span class="${c||''}">${m}</span>\n`;
+
+const req = wire.build({
+  chainId: 84532, nonce: 0,
+  to: toChecksumAddress("0x742d35cc6634c0532925a3b844bc454e4438f44e"),
+  value: 10n ** 15n, gas: 21000, maxFee: 2n * 10n ** 9n, maxPrio: 10n ** 8n,
+});
+say(`request  ${JSON.stringify(req)}`);
+const dg = await wire.digest(req);
+const frames = wire.encode(req);
+say(`digest   ${dg}`);
+say(`frames   ${frames.length}  (${frames[0].length} chars)`);
+
+// every frame must survive a real QR round trip
+const det = new BarcodeDetector({ formats: ["qr_code"] });
+let scanned = 0;
+for (const f of frames) {
+  const m = encodeQR(f), n = m.length, q = 4, sc = 6, px = (n + q*2) * sc;
+  const cv = document.createElement("canvas"); cv.width = cv.height = px;
+  const g = cv.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0,0,px,px); g.fillStyle = "#000";
+  for (let r=0;r<n;r++) for (let c=0;c<n;c++) if (m[r][c]) g.fillRect((c+q)*sc,(r+q)*sc,sc,sc);
+  const d = await det.detect(cv);
+  if (d[0]?.rawValue === f) scanned++;
+}
+say(`QR       ${scanned}/${frames.length} frames scanned back identically`,
+    scanned === frames.length ? "ok" : "bad");
+
+// and the device must accept it and hand back a signed transaction
+try {
+  const res = await fetch("http://127.0.0.1:8799/", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ request: req }),
+  }).then(r => r.json());
+  if (!res.ok) throw new Error(res.error);
+  say(`device   signed at ${res.tier} tier, from ${res.from}`, "ok");
+  say(`txid     ${res.txid}`);
+  say(`raw      ${res.raw.slice(0,70)}…  (${res.raw.length} chars)`);
+  say(`digest   device says ${res.digest}, browser said ${dg}  ${res.digest===dg?"MATCH":"MISMATCH"}`,
+      res.digest===dg ? "ok" : "bad");
+  say(`\ndevice screen:\n${res.display.map(l=>"  | "+l).join("\n")}`);
+} catch (e) {
+  say(`device   ${e.message}`, "bad");
+  say(`         (start it with: .venv/bin/python cell4b/bridge/mock_cell.py)`);
+}
+
+// and it must refuse calldata
+try {
+  const bad = { ...req, data: "0xdeadbeef" };
+  const r = await fetch("http://127.0.0.1:8799/", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ request: bad }) }).then(r=>r.json());
+  say(`calldata ${r.ok ? "NOT REFUSED — bug" : "refused: " + r.error.slice(0,58) + "…"}`,
+      r.ok ? "bad" : "ok");
+} catch (e) { say(`calldata check failed: ${e.message}`, "bad"); }
+</script>

@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8">
+<style>
+body{font:13px/1.5 ui-monospace,Menlo,monospace;background:#0f1318;color:#e6ebf2;
+  width:290px;margin:0;padding:16px}
+h1{font:600 14px ui-sans-serif,system-ui;margin:0 0 2px}
+p{color:#7c8896;font-size:11px;margin:0 0 12px}
+label{display:block;font-size:11px;color:#7c8896;margin-bottom:5px}
+input{width:100%;box-sizing:border-box;padding:8px 10px;border-radius:7px;
+  border:1px solid #2b333d;background:#0a0d11;color:#e6ebf2;font:inherit;font-size:12px}
+button{width:100%;margin-top:9px;padding:9px;border-radius:7px;border:1px solid #2b333d;
+  background:#151b22;color:#e6ebf2;font:inherit;font-size:12px;cursor:pointer}
+button:hover{background:#1b222b}
+#s{margin-top:10px;font-size:11px;color:#7c8896;white-space:pre-wrap}
+.ok{color:#5fd39a}.bad{color:#f08a7a}
+</style>
+<h1>CELL bridge</h1>
+<p>Value transfers route to the device. Contract calls stay with your wallet.</p>
+<label for="u">device endpoint</label>
+<input id="u" placeholder="http://127.0.0.1:8799">
+<button id="save">Save</button>
+<button id="probe">Probe device</button>
+<div id="s"></div>
+<script src="popup.js"></script>

@@ -1,0 +1,54 @@
+<!doctype html><meta charset="utf-8"><title>QR round trip</title>
+<style>body{font:13px ui-monospace,Menlo,monospace;background:#111;color:#ddd;padding:20px}
+pre{line-height:1.4}.ok{color:#4ade80}.bad{color:#f87171}</style>
+<pre id="out">running...</pre>
+<script type="module">
+import { encodeQR, matrixToSVG } from "./extension/lib/qr.js";
+
+const out = document.getElementById("out");
+const log = (s, cls) => out.innerHTML += `\n${cls ? `<span class="${cls}">${s}</span>` : s}`;
+
+function draw(matrix, scale = 6, quiet = 4) {
+  const n = matrix.length, px = (n + quiet * 2) * scale;
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = px;
+  const g = cv.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, px, px);
+  g.fillStyle = "#000";
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++)
+    if (matrix[r][c]) g.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
+  return cv;
+}
+
+const CASES = [
+  ["short", "p1of1 SGVsbG8="],
+  ["typical frame", "p1of3 " + btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(180))))],
+  ["full 300-char chunk", "p2of4 " + "QUJDRA".repeat(50)],
+  ["hex signature", "0x" + "ab".repeat(65)],
+];
+
+out.textContent = "";
+if (!("BarcodeDetector" in window)) {
+  log("BarcodeDetector unavailable -- cannot verify", "bad");
+} else {
+  const det = new BarcodeDetector({ formats: ["qr_code"] });
+  let pass = 0;
+  for (const [name, text] of CASES) {
+    try {
+      const m = encodeQR(text);
+      const cv = draw(m);
+      const found = await det.detect(cv);
+      const got = found[0]?.rawValue;
+      const ok = got === text;
+      if (ok) pass++;
+      log(`${ok ? "PASS" : "FAIL"}  ${name.padEnd(22)} v${(m.length-17)/4}  ${m.length}x${m.length}  ${text.length} chars`,
+          ok ? "ok" : "bad");
+      if (!ok) log(`        wanted ${JSON.stringify(text.slice(0,40))}\n        got    ${JSON.stringify((got||"").slice(0,40))}`, "bad");
+      document.body.appendChild(cv);
+    } catch (e) {
+      log(`FAIL  ${name}: ${e.message}`, "bad");
+    }
+  }
+  log(`\n${pass}/${CASES.length} round-tripped through BarcodeDetector`, pass === CASES.length ? "ok" : "bad");
+}
+</script>
