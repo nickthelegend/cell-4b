@@ -39,9 +39,27 @@ from gpiozero import DigitalOutputDevice, Button
 # limit. Never move the IR to the 5 V rail in a sink build.
 EMITTER_SINK = True
 
-# The laser needs 20-40 mA, far past a pin's 16 mA, so it cannot be sunk and
-# always needs a real switch. False makes laser() say so instead of pretending.
-LASER_FITTED = False
+# The laser needs 20-40 mA, far past a pin's 16 mA, so it can never be sunk by
+# a pin the way the LEDs are. It needs either a transistor or -- as on this
+# build -- a module with a TTL ENABLE input, which is a logic input drawing
+# almost nothing while the module takes its current straight off +5 V.
+#
+# Set True once that driver exists. False makes laser() say so rather than
+# pretending, which is the honest failure: a laser that silently does nothing
+# reads exactly like a laser that is working and pointed somewhere harmless.
+LASER_FITTED = True
+
+# BENCH ONLY. True lets laser() fire with no cartridge seated.
+#
+# This exists because the cartridge switch is not built yet -- there are no
+# printed cartridges and no microswitch in the slot, so GPIO22 has nothing
+# real to report. It is NOT a convenience switch for when the interlock is
+# annoying, and every call it permits announces itself.
+#
+# Set it back to False the moment a real switch is in a real slot. An
+# interlock that stays overridden is not an interlock, and this flag exists
+# to be removed.
+BENCH_NO_INTERLOCK = True
 
 # --- ASSEMBLY.md section 5 -------------------------------------------------
 PIN_WHITE_1 = 12
@@ -135,7 +153,12 @@ class Bench:
                 "module needs 20-40 mA, well past a GPIO's 16 mA, so it cannot "
                 "be sunk like the LEDs -- it needs a transistor. Everything up "
                 "to M5 runs without it; only M6 speckle needs the laser.")
-        if require_seated and not self.seated:
+        if require_seated and BENCH_NO_INTERLOCK and not self.seated:
+            # Loud on purpose: a bypassed safety should never be silent.
+            print("  !! BENCH_NO_INTERLOCK: firing with no cartridge seated. "
+                  "This is not a safe configuration -- it is a stand-in until "
+                  "the switch exists.")
+        elif require_seated and not self.seated:
             raise InterlockError(
                 "no cartridge seated (GPIO22 high) -- laser refused. "
                 "Seat a cartridge, or pass require_seated=False if you are "

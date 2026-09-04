@@ -147,8 +147,8 @@
   {
    "name": "shell_lower",
    "qty": 1,
-   "triangles": 52564,
-   "volume_mm3": 55382.22,
+   "triangles": 52468,
+   "volume_mm3": 54307.68,
    "watertight": true,
    "bbox": [
     92.0,
@@ -365,7 +365,7 @@
   }
  ],
  "audit": {
-  "checks": 419,
+  "checks": 421,
   "failed": 0
  },
  "gaps": [
@@ -793,14 +793,14 @@
    "a": "mock_laser",
    "b": "shell_lower",
    "kind": "clear",
-   "mm": 14.89,
+   "mm": 16.47,
    "status": "PASS"
   },
   {
    "a": "mock_leds",
    "b": "shell_lower",
    "kind": "clear",
-   "mm": 16.81,
+   "mm": 17.17,
    "status": "PASS"
   },
   {

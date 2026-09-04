@@ -472,12 +472,20 @@ def shell_lower():
                             S.SLOT_W / 2, -S.ENV_Y / 2 + S.WALL + 1))
             cuts.append(_cart_channel(pad=0.15))
         # back wall: USB-C / micro-HDMI x2 / A-V
-        if S.PI_PCB_Z <= z <= S.PI_PCB_Z + S.PI_PCB_T + S.PI_PORTS_Y0_H:
+        #
+        # Cut from the FLOOR, not from the board. The ports stand PI_PORT_PROUD
+        # into the wall, so in the fitted position they are already inside it --
+        # which means the board can only arrive from directly above, with the
+        # port blocks travelling down inside this window. Starting the window at
+        # the PCB left solid wall underneath, and the board could not be
+        # inserted at all: dropping it fouled the ports, and sliding it aside
+        # needed 3 mm of lateral room when the cavity offers 1.10.
+        if S.FLOOR <= z <= S.PI_PCB_Z + S.PI_PCB_T + S.PI_PORTS_Y0_H:
             x0, _ = S.pi_to_case(S.PI_PORTS_Y0[1], 0.0)
             x1, _ = S.pi_to_case(S.PI_PORTS_Y0[0], 0.0)
             cuts.append(box(x0, S.ENV_Y / 2 - S.WALL - 1, x1, S.ENV_Y / 2 + 1))
-        # left wall: Ethernet + 4x USB
-        if S.PI_PCB_Z <= z <= S.PI_PCB_Z + S.PI_PCB_T + S.PI_USB_H:
+        # left wall: Ethernet + 4x USB -- same reasoning as the back wall
+        if S.FLOOR <= z <= S.PI_PCB_Z + S.PI_PCB_T + S.PI_USB_H:
             _, y0 = S.pi_to_case(0.0, S.PI_PORTS_X85[1])
             _, y1 = S.pi_to_case(0.0, S.PI_PORTS_X85[0])
             cuts.append(box(-S.ENV_X / 2 - 1, y0, -S.ENV_X / 2 + S.WALL + 1, y1))

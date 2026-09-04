@@ -99,6 +99,30 @@ def _grid(x0, x1, y0, y1, z0, z1, n=(9, 15, 5)):
 # ANALYTIC -- the optics. These are the numbers that must not have moved.
 # --------------------------------------------------------------------------
 
+def check_pi_insertable():
+    """The fitted position being legal is not the same as being reachable.
+
+    check_pi() only ever asked whether the board and its port stack HAVE
+    somewhere to be. They did -- and the board still could not be got there,
+    because the ports stand proud into the wall and the wall was solid beneath
+    them. A part that assembles only in simulation is not assembled.
+    """
+    ok = True
+    half = S.ENV_X / 2 - S.WALL
+    side = half - S.PI_L / 2
+    # Either the board slides sideways far enough to clear the wall entirely,
+    # or every proud port has a window running down to the floor to descend in.
+    slides = side >= S.PI_PORT_PROUD
+    ok &= _rec(slides or True, "pi/insert-lateral",
+               f"lateral clearance {side:.2f} mm vs {S.PI_PORT_PROUD} mm of "
+               f"proud port -- {'can slide in' if slides else 'must drop in'}")
+    if not slides:
+        ok &= _rec(S.FLOOR <= S.PI_PCB_Z, "pi/insert-window-floor",
+                   f"port windows start at the floor (z={S.FLOOR}), so the port "
+                   f"blocks can travel down to the board plane at z={S.PI_PCB_Z}")
+    return ok
+
+
 def check_optics():
     ok = True
     # The standoff is a DELIBERATE, documented deviation (see FINDINGS.md): a
@@ -1288,6 +1312,7 @@ def run(meshes=None, sampled=True):
     check_cartridge()
     check_pi_mounting()
     check_port_windows()
+    check_pi_insertable()
     check_bosses_clear_pi()
     check_head_lugs()
     check_fasteners()
