@@ -1,0 +1,117 @@
+<!doctype html><meta charset="utf-8"><title>shim end to end</title>
+<style>body{font:13px/1.6 ui-monospace,Menlo,monospace;background:#0f1318;color:#e6ebf2;padding:22px}
+.ok{color:#5fd39a}.bad{color:#f08a7a}pre{white-space:pre-wrap}</style>
+<h3 style="font:600 15px ui-sans-serif,system-ui;margin:0 0 4px">shim end to end</h3>
+<div style="color:#7c8896;font-size:12px;margin-bottom:14px">
+  Loads the real inpage.js, stubs a wallet, and drives eth_sendTransaction.</div>
+<pre id="o">running…</pre>
+<script>
+// Stand-in for content.js + background.js. Speaks the same postMessage
+// protocol and does exactly what the service worker does: relay to the device.
+window.addEventListener("message", async (ev) => {
+  if (ev.source !== window || ev.data?.channel !== "cell-bridge") return;
+  const { id, payload } = ev.data;
+  let reply;
+  try {
+    const res = await fetch("http://127.0.0.1:8799/", {
+      method: payload.type === "cell:probe" ? "GET" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: payload.type === "cell:probe" ? undefined
+                                          : JSON.stringify({ request: payload.request }),
+    });
+    const json = await res.json();
+    reply = payload.type === "cell:probe" ? { ok: true, info: json }
+                                          : { ok: true, result: json };
+  } catch (e) { reply = { ok: false, error: String(e.message || e) }; }
+  window.postMessage({ channel: "cell-bridge-reply", id, reply }, "*");
+});
+
+// A stub wallet. Answers the reads the shim needs, and records what it is
+// asked to broadcast.
+const SENT = [];
+window.ethereum = {
+  isMetaMask: true,
+  async request({ method, params }) {
+    switch (method) {
+      case "eth_chainId": return "0x14a34";                 // Base Sepolia
+      case "eth_accounts": return ["0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf"];
+      case "eth_getTransactionCount": return "0x7";
+      case "eth_maxPriorityFeePerGas": return "0xf4240";
+      case "eth_getBlockByNumber": return { baseFeePerGas: "0x3b9aca00" };
+      case "eth_sendRawTransaction": SENT.push(params[0]); return "0xBROADCAST_OK";
+      default: throw new Error("stub wallet: unexpected " + method);
+    }
+  },
+};
+window.__SENT = SENT;
+</script>
+<script type="module" src="./extension/inpage.js"></script>
+<script type="module">
+const o = document.getElementById("o"); o.textContent = "";
+const say = (m, c) => o.innerHTML += `<span class="${c||''}">${m}</span>\n`;
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+await wait(400);
+
+say(`wrapper installed: ${window.ethereum.__cellWrapped === true}`,
+    window.ethereum.__cellWrapped ? "ok" : "bad");
+
+// ---- 1. a plain transfer must be intercepted ----------------------------
+const pending = window.ethereum.request({
+  method: "eth_sendTransaction",
+  params: [{ from: "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
+             to: "0x742d35cc6634c0532925a3b844bc454e4438f44e",   // lowercase on purpose
+             value: "0x8e1bc9bf04000" }],
+});
+await wait(900);
+const overlay = document.querySelector(".cellbr-root");
+say(`overlay appeared: ${!!overlay}`, overlay ? "ok" : "bad");
+if (overlay) {
+  const styled = getComputedStyle(overlay).position === "fixed";
+  say(`overlay stylesheet applied: ${styled}`, styled ? "ok" : "bad");
+  const qr = overlay.querySelector(".cellbr-qr path")?.getAttribute("d")?.length ?? 0;
+  say(`QR rendered: ${qr > 500 ? "yes (" + qr + " path chars)" : "NO"}`, qr > 500 ? "ok" : "bad");
+  const lines = overlay.querySelector(".cellbr-lines").textContent;
+  say(`device panel:\n${lines.split("\n").map(l => "    | " + l).join("\n")}`);
+  // The wallet handed us a lowercase address; the device rejects a bad
+  // checksum, so the shim must re-case it. Compare on the joined text, not on
+  // a guessed line break.
+  const flat = lines.replace(/\s+/g, "");
+  const checksummed = flat.includes("0x742d35Cc6634C0532925a3b844Bc454e4438f44e");
+  say(`address re-checksummed to EIP-55: ${checksummed}`, checksummed ? "ok" : "bad");
+  overlay.querySelector('[data-act="mock"]').click();
+  // Poll rather than guess: the overlay closes shortly after the device
+  // answers, so a fixed wait races the teardown.
+  let after = "", fromDevice = false;
+  for (let i = 0; i < 60 && !fromDevice; i++) {
+    after = document.querySelector(".cellbr-lines")?.textContent ?? after;
+    fromDevice = after.includes("BASE SEPOLIA");
+    if (!fromDevice) await wait(50);
+  }
+  say(`panel replaced by the device's own render: ${fromDevice}`, fromDevice ? "ok" : "bad");
+  if (fromDevice) say(`    | ${after.split("\n")[0]}   (browser had guessed "CHAIN 84532")`);
+}
+let hash = null, err = null;
+try { hash = await Promise.race([pending, wait(9000).then(() => { throw new Error("timed out"); })]); }
+catch (e) { err = e.message; }
+say(`broadcast returned: ${hash ?? "— " + err}`, hash === "0xBROADCAST_OK" ? "ok" : "bad");
+say(`raw tx handed to the wallet: ${window.__SENT[0] ? window.__SENT[0].slice(0, 50) + "…" : "NONE"}`,
+    window.__SENT[0] ? "ok" : "bad");
+
+// ---- 2. calldata must be refused, without ever reaching the device ------
+let refused = null;
+try {
+  await window.ethereum.request({ method: "eth_sendTransaction", params: [{
+    from: "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
+    to: "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+    value: "0x0", data: "0xa9059cbb0000000000000000000000000000" }] });
+} catch (e) { refused = e; }
+say(`\ncalldata refused: ${!!refused}`, refused ? "ok" : "bad");
+if (refused) say(`  code ${refused.code} — ${refused.message.slice(0, 76)}…`);
+say(`no second overlay opened: ${document.querySelectorAll(".cellbr-root").length === 0}`,
+    document.querySelectorAll(".cellbr-root").length === 0 ? "ok" : "bad");
+
+// ---- 3. everything else must pass straight through ----------------------
+const chain = await window.ethereum.request({ method: "eth_chainId" });
+say(`passthrough eth_chainId: ${chain}`, chain === "0x14a34" ? "ok" : "bad");
+say(`\ndone`, "ok");
+</script>

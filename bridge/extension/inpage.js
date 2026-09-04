@@ -15,10 +15,14 @@ import { encodeQR } from "./lib/qr.js";
 import * as wire from "./lib/wire.js";
 import { toChecksumAddress } from "./lib/keccak.js";
 
-const CSS_URL = document.currentScript?.dataset?.cssUrl;
-if (CSS_URL) {
+// document.currentScript is null inside a module -- the dataset the content
+// script attached is unreachable from here. import.meta.url is the module-safe
+// way to find our own directory, and it works whatever URL the extension was
+// loaded from.
+{
   const l = document.createElement("link");
-  l.rel = "stylesheet"; l.href = CSS_URL;
+  l.rel = "stylesheet";
+  l.href = new URL("./overlay.css", import.meta.url).href;
   (document.head || document.documentElement).append(l);
 }
 
@@ -95,8 +99,15 @@ function overlay(req, frames, digest, lines) {
         ev.target.disabled = false;
         if (!r?.ok) return say(r?.error || "device unreachable — is mock_cell.py running?");
         if (!r.result?.ok) return say(r.result?.error || "the gate refused");
+        // Replace the preview with what the device actually put on its screen.
+        // The browser has no chain registry and renders "CHAIN 84532" where the
+        // device says "BASE SEPOLIA"; if the two ever disagree about anything
+        // that matters, the device's version is the one worth showing.
+        if (Array.isArray(r.result.display)) {
+          root.querySelector(".cellbr-lines").textContent = r.result.display.join("\n");
+        }
         say(`signed at ${r.result.tier} tier`, true);
-        setTimeout(() => done({ raw: r.result.raw }), 700);
+        setTimeout(() => done({ raw: r.result.raw }), 900);
       }
     });
     root.querySelector('[data-act="raw"]').addEventListener("keydown", (ev) => {

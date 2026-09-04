@@ -8,8 +8,6 @@
 const el = document.createElement("script");
 el.type = "module";
 el.src = chrome.runtime.getURL("inpage.js");
-el.dataset.qrUrl = chrome.runtime.getURL("lib/qr.js");
-el.dataset.cssUrl = chrome.runtime.getURL("overlay.css");
 (document.head || document.documentElement).prepend(el);
 
 window.addEventListener("message", (ev) => {

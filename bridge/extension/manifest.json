@@ -3,18 +3,44 @@
   "name": "CELL bridge",
   "version": "0.1.0",
   "description": "Route a dApp's value transfers to a CELL device, and sign them with blood.",
-  "permissions": ["storage"],
-  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
-  "background": { "service_worker": "background.js" },
-  "content_scripts": [{
-    "matches": ["<all_urls>"],
-    "js": ["content.js"],
-    "run_at": "document_start",
-    "world": "ISOLATED"
-  }],
-  "web_accessible_resources": [{
-    "resources": ["inpage.js", "lib/qr.js", "lib/wire.js", "overlay.css"],
-    "matches": ["<all_urls>"]
-  }],
-  "action": { "default_popup": "popup.html", "default_title": "CELL bridge" }
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "inpage.js",
+        "lib/qr.js",
+        "lib/wire.js",
+        "lib/keccak.js",
+        "overlay.css"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "CELL bridge"
+  }
 }
