@@ -99,9 +99,20 @@ def check_cartridge_switch() -> str:
 
 
 def check_emitters() -> str:
-    """Each emitter must raise Clear above dark. Catches a dead LED or a
-    swapped rail before it looks like a light leak."""
+    """Each emitter must raise Clear above dark.
+
+    NEEDS A CARTRIDGE SEATED. The emitters point down at the read spot, not at
+    the sensor -- the AS7341 only ever sees light that something SCATTERS back
+    up the aperture. With the slot empty there is nothing to scatter off and
+    the light leaves through the slot, so a perfectly good LED reads as dark.
+    This check used to run without one and blamed the wiring for it.
+    """
     with Bench() as b, Spectrometer() as s:
+        if not b.seated:
+            return _line(WARN, "emitters",
+                         "no cartridge seated -- nothing for the light to "
+                         "scatter off. Seat the reference cartridge and re-run; "
+                         "an empty chamber reads dark no matter how good the LED.")
         with b.dark():
             dark = s.read().clear
         rows, bad = [], []
@@ -160,6 +171,13 @@ def check_light_tight(n: int = 10) -> str:
     return _line(PASS, "light-tight (M4)", detail)
 
 
+# Checks that only mean anything once the optical head is built. On a
+# breadboard the emitters are not in their bores aiming at a read spot and the
+# sensor is not looking down the aperture, so "no light" says nothing about the
+# wiring -- it says the optics do not exist yet. Reporting that as FAIL sent us
+# hunting a wiring fault that was never there.
+NEEDS_OPTICS = {"emitters", "headroom", "lighttight"}
+
 ORDER = [
     ("i2c", check_i2c, False),
     ("interlock", check_interlock, False),
@@ -170,11 +188,15 @@ ORDER = [
 ]
 
 
-def main(only: str | None = None, skip_prompts: bool = False) -> int:
-    print("CELL-4B self-test\n")
+def main(only: str | None = None, skip_prompts: bool = False,
+         breadboard: bool = False) -> int:
+    print("CELL-4B self-test" + (" -- breadboard stage\n" if breadboard else "\n"))
     results = {}
     for name, fn, interactive in ORDER:
         if only and name != only:
+            continue
+        if breadboard and name in NEEDS_OPTICS:
+            _line(WARN, name, "needs the assembled head -- skipped on a breadboard")
             continue
         if interactive and skip_prompts:
             _line(WARN, name, "skipped (needs you at the bench)")

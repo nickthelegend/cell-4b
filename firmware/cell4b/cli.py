@@ -14,6 +14,8 @@ def main(argv=None) -> int:
                                   "headroom lighttight")
     t.add_argument("--no-prompts", action="store_true",
                    help="skip the checks that need you at the bench")
+    t.add_argument("--breadboard", action="store_true",
+                   help="skip the checks that need the assembled optical head")
 
     r = sub.add_parser("read", help="one averaged reading under white light")
     r.add_argument("-n", type=int, default=10)
@@ -33,7 +35,8 @@ def main(argv=None) -> int:
 
     if a.cmd == "selftest":
         from .selftest import main as st
-        return st(only=a.only, skip_prompts=a.no_prompts)
+        return st(only=a.only, skip_prompts=a.no_prompts,
+                  breadboard=a.breadboard)
 
     if a.cmd == "status":
         from .display import Display

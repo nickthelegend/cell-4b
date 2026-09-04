@@ -37,6 +37,10 @@ class Display:
                     break
             if self.dev is None:
                 raise last or RuntimeError("no OLED found")
+            # luma blanks the panel in its atexit cleanup, so every script left
+            # the screen dark the moment it finished -- which reads exactly like
+            # a dead display. persist=True keeps the last frame up after exit.
+            self.dev.persist = True
             self._font = ImageFont.load_default()
         except Exception as e:
             self.error = str(e)

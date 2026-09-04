@@ -32,6 +32,13 @@ SATURATED = 0.95 * FULL_SCALE
 # Below this a channel is in the noise and any ratio built on it is fiction.
 FLOOR = 0.02 * FULL_SCALE
 
+# The Adafruit driver's `gain` is an ENUM INDEX, not a multiplier -- setting it
+# to 8 selects index 8, which is 128x. That silently ran this file at 16x the
+# intended gain until an out-of-range value (64) finally raised. Everything
+# here speaks in multipliers and converts at the boundary.
+GAIN_STEPS = {0.5: 0, 1: 1, 2: 2, 4: 3, 8: 4, 16: 5, 32: 6,
+              64: 7, 128: 8, 256: 9, 512: 10}
+
 
 @dataclass
 class Reading:
@@ -75,11 +82,15 @@ class Spectrometer:
         self.dev = AS7341(self.i2c, address=I2C_ADDR)
         self.set_timing(atime, astep, gain)
 
-    def set_timing(self, atime: int, astep: int, gain: int) -> None:
+    def set_timing(self, atime: int, astep: int, gain: float) -> None:
+        if gain not in GAIN_STEPS:
+            raise ValueError(
+                f"gain must be one of {sorted(GAIN_STEPS)} (a multiplier, "
+                f"not the register index) -- got {gain}")
         self.atime, self.astep, self.gain = atime, astep, gain
         self.dev.atime = atime
         self.dev.astep = astep
-        self.dev.gain = gain
+        self.dev.gain = GAIN_STEPS[gain]
         # One integration plus slack, so the first read after a change is not
         # a leftover from the old timing.
         self._wait = ((atime + 1) * (astep + 1) * 2.78 / 1e6) + 0.05
