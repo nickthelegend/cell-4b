@@ -50,6 +50,10 @@ class State:
 
 
 S = State()
+# --demo pre-arms the override so a filmed run completes without a sample. It
+# still lights DEMO GATE ON in the header for the whole session: a bypass that
+# does not announce itself is worse than no gate.
+S.demo = "--demo" in sys.argv
 Q = queue.Queue()
 
 
@@ -138,7 +142,15 @@ def sign_tx(tx):
         max_priority_fee_per_gas=int(tx["maxPrio"], 16),
         max_fee_per_gas=int(tx["maxFee"], 16),
         gas_limit=tx["gas"], to=tx["to"], value=int(tx["value"], 16))
-    S.display = t.render() if hasattr(t, "render") else []
+    # The device renders with ops.EthereumSpend and signs with
+    # eth.EthTransaction. They are separate on purpose -- one is what the owner
+    # reads, the other is what the signature commits to -- and EthTransaction
+    # has no render() at all, so hasattr() here quietly showed nothing.
+    import ops
+    S.display = ops.EthereumSpend(
+        amount_wei=t.value, destination=t.to, chain_id=t.chain_id,
+        chain_name=t.chain_name(), nonce=t.nonce,
+        max_fee_wei=t.max_fee_wei()).render()
     sk = bytes.fromhex("59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")
     r, s_, y = eth.sign(t, sk)
     return t.txid(r, s_, y), t.encode_signed(r, s_, y).hex(), eth.sender(t, r, s_, y)
