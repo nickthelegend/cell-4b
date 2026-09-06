@@ -7,10 +7,15 @@ nothing in software should assume that. So every laser call re-reads the switch
 and refuses on its own account. Two independent refusals, one of which you can
 test without a multimeter.
 
-Pinout is ASSEMBLY.md section 5, and the rails are NOT interchangeable there:
-the white LEDs sit behind 68 ohm to +5V (~28 mA), the 940 nm part behind 47 ohm
-to +3V3 (~41 mA). Swap the rails and you either barely light the whites or cook
-the IR. That is a soldering fact, not a software one, but it is why the two
+Pinout is ASSEMBLY.md section 5. This build fits 120 ohm on all three emitters,
+NOT the 68/47 the optical design asks for: those assume a transistor in the
+ground return, and with EMITTER_SINK the pin itself carries the current against
+a 16 mA rating -- 68 ohm is 27.9 mA and 47 ohm is 41.5 mA.
+
+The rails are still NOT interchangeable. Whites on +5V (Vf ~3.1 V, so +3V3
+barely lights them); the 940 nm on +3V3, because a sink LED floats its pin to
+(rail - Vf) while the pin is an input, and 5 - 1.35 = 3.65 V is over the pad
+limit. That is a soldering fact, not a software one, but it is why the two
 groups are named apart here instead of being one list.
 """
 from __future__ import annotations
@@ -59,7 +64,11 @@ LASER_FITTED = True
 # Set it back to False the moment a real switch is in a real slot. An
 # interlock that stays overridden is not an interlock, and this flag exists
 # to be removed.
-BENCH_NO_INTERLOCK = True
+# The switch now exists and GPIO22 follows it, so the bypass is gone. It was
+# only ever a stand-in for a slot that had no switch in it, and a full
+# component run on 2026-09-07 showed what leaving it costs: the laser fired
+# with nothing seated, and the run recorded its own interlock as broken.
+BENCH_NO_INTERLOCK = False
 
 # --- ASSEMBLY.md section 5 -------------------------------------------------
 PIN_WHITE_1 = 12
@@ -163,12 +172,39 @@ class Bench:
                 "no cartridge seated (GPIO22 high) -- laser refused. "
                 "Seat a cartridge, or pass require_seated=False if you are "
                 "deliberately aligning with the shell open.")
+        # The check above happens ONCE, but the block can be long -- M6's
+        # speckle series holds this open for 600 s. Checking only at entry
+        # means a switch that is pressed for a moment buys a ten-minute
+        # exposure, which is the difference between an enable and a bypass.
+        # So the beam also follows the switch for as long as it is on: let go
+        # and it drops, whether the switch is a lever in the slot or a tactile
+        # held by hand.
+        cut = {"n": 0}
+
+        def _on_release():
+            self._laser.off()               # beam first, bookkeeping after
+            cut["n"] += 1
+            print("  !! switch released with the laser on -- beam cut.")
+
+        prev = self.cartridge.when_released
+        if require_seated:
+            self.cartridge.when_released = _on_release
         self._laser.on()
         time.sleep(self.settle)
         try:
             yield
         finally:
             self._laser.off()
+            if require_seated:
+                self.cartridge.when_released = prev
+        # Only reached on a clean exit. A run that lost the beam part way is
+        # not a short run, it is a run whose later frames are dark -- say so
+        # rather than letting it look like data.
+        if cut["n"]:
+            raise InterlockError(
+                f"the cartridge switch opened {cut['n']}x while the laser was "
+                "on. The beam was cut each time, so frames after the first "
+                "break are dark -- discard this run and repeat it.")
 
     @contextmanager
     def dark(self):

@@ -36,6 +36,27 @@ FLOOR = 0.02 * FULL_SCALE
 # to 8 selects index 8, which is 128x. That silently ran this file at 16x the
 # intended gain until an out-of-range value (64) finally raised. Everything
 # here speaks in multipliers and converts at the boundary.
+# What is actually soldered on the emitters. 120 was the first build; 220 is
+# what the parts drawer had. Either is fine -- both sit under the 16 mA pin
+# rating, and the only thing that changes is how long the sensor stays open.
+EMITTER_OHMS = 220
+
+# The reference point the timing is scaled from: 120 ohm wanted ATIME 99 at
+# ASTEP 1799, which is ~500 ms.
+_REF_OHMS, _REF_ATIME = 120, 99
+
+
+def atime_for(ohms: int, astep: int = 1799) -> int:
+    """ATIME that holds the collected light constant as the resistor changes.
+
+    Current goes as 1/R, so the sensor has to stay open in proportion to R.
+    Clamped to the register's 255, which 220 ohm is nowhere near -- it lands
+    on 182, about 916 ms, under 2% of the 46.6 s the part can integrate for.
+    """
+    scaled = round((_REF_ATIME + 1) * ohms / _REF_OHMS) - 1
+    return max(0, min(255, scaled))
+
+
 GAIN_STEPS = {0.5: 0, 1: 1, 2: 2, 4: 3, 8: 4, 16: 5, 32: 6,
               64: 7, 128: 8, 256: 9, 512: 10}
 
@@ -66,18 +87,27 @@ class Reading:
 class Spectrometer:
     """The AS7341 at 0x39, with defaults for a 28 mm standoff."""
 
-    # ATIME 99 / ASTEP 1799 is ~500 ms: long, deliberately, and for two
-    # independent reasons that stack.
+    # Integration is long, deliberately, for two reasons that stack.
     #
     #   1. The sensor is at 28 mm, not upstream's 9 mm -- about 9.7x less light.
-    #   2. This build runs 120 ohm emitter resistors rather than the 68/47 the
-    #      design calls for, which is 15.0 mA into the whites (59% of design)
-    #      and 15.4 mA into the 940 nm (43%).
+    #   2. The emitters run well under the design current. Sinking (no 2N7000
+    #      since d514af1) the pin carries the LED, and a Pi pin is rated 16 mA,
+    #      so the 68/47 the optical design asks for cannot be used here at all
+    #      -- they would be 27.9 and 41.5 mA.
     #
-    # (2) alone wants 1.7x more integration for the whites, so 278 ms became
-    # 500 ms. If you fit the design resistors later this can go back down --
-    # but verify with headroom() rather than assuming, in either direction.
-    def __init__(self, atime: int = 99, astep: int = 1799, gain: int = 8):
+    # ATIME is DERIVED from the resistor rather than hard-coded, because the
+    # two have to move together: halving the drive current halves the light,
+    # and the sensor has to sit open twice as long to collect the same photons.
+    # Set EMITTER_OHMS to what is actually soldered and the timing follows.
+    # Getting this backwards is the failure it prevents -- 220 ohm timing on
+    # 120 ohm hardware over-integrates 1.8x and saturates.
+    #
+    # Same photons either way, so shot-noise-limited SNR is unchanged; what a
+    # bigger resistor costs is read TIME, and this instrument has 46.6 s of it.
+    def __init__(self, atime: int | None = None, astep: int = 1799,
+                 gain: int = 8):
+        if atime is None:
+            atime = atime_for(EMITTER_OHMS, astep)
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.dev = AS7341(self.i2c, address=I2C_ADDR)
         self.set_timing(atime, astep, gain)

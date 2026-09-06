@@ -44,15 +44,23 @@ mistake that destroys a part:
 | Pin | Function | Resistor | Rail |
 |---|---|---|---|
 | GPIO2/3 | I²C1 — AS7341 0x39, OLED 0x3C | — | 3V3 |
-| GPIO12 | white LED #1 | 68 Ω | **+5 V** |
-| GPIO16 | white LED #2 | 68 Ω | **+5 V** |
-| GPIO23 | 940 nm IR | 47 Ω | **+3V3** |
-| GPIO6 | laser gate | — | via microswitch |
+| GPIO12 | white LED #1 | **220 Ω** | **+5 V** |
+| GPIO16 | white LED #2 | **220 Ω** | **+5 V** |
+| GPIO23 | 940 nm IR | **220 Ω** | **+3V3** |
+| GPIO6 | laser ENABLE | — | module off +5 V |
 | GPIO22 | cartridge switch | internal pull-up | LOW when seated |
 
-**The two rails are different rails.** 68 Ω on +5 V gives a white LED ≈ 28 mA;
-on +3V3 it gives ≈ 3 mA and barely lights. 47 Ω on +3V3 gives the 940 nm part
-≈ 41 mA; on +5 V it passes ≈ 78 mA and cooks it.
+**120 Ω, not the 68/47 the optical design asks for.** Those assume a transistor
+in the ground return. `EMITTER_SINK = True`, so the **GPIO carries the current**
+and a Pi pin is rated 16 mA — 68 Ω would be 27.9 mA and 47 Ω would be 41.5 mA,
+straight past it. Do not "correct" the resistors without also fitting
+transistors and setting the flag to `False`.
+
+**The two rails are different rails.** The white LEDs must be on **+5 V**: their
+V<sub>f</sub> is ~3.1 V, so from +3V3 they barely conduct. The 940 nm must stay
+on **+3V3**: in a sink build the pin floats to (rail − V<sub>f</sub>) while it is
+an input, and at V<sub>f</sub> 1.35 V from +5 V that is 3.65 V, over the 3.3 V
+pad limit.
 
 Only **one** 2.2 kΩ pull-up pair on the I²C bus — keep the one the breakout
 ships with.
