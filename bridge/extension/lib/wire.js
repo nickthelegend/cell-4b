@@ -3,7 +3,10 @@
 
 export const VERSION = 1;
 export const OP_SEND = "eth.send";
-export const CHUNK = 300;
+export // 700, not upstream's 300: that is sized for the device's 240x240
+// screen, and this is a laptop display read by a 720p camera. At 300 a
+// contract call became two frames that animated for no reason.
+const CHUNK = 700;
 
 const hex = (v) => "0x" + BigInt(v).toString(16);
 

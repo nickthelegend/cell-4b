@@ -312,18 +312,30 @@ left = tk.Frame(body, bg=BG); left.pack(side="left", fill="both", expand=True)
 right = tk.Frame(body, bg=BG); right.pack(side="right", fill="both",
                                           expand=True, padx=(14, 0))
 
-# --- QR camera
-p1 = panel(left); p1.pack(fill="both", expand=True)
-tk.Label(p1, text="QR CAMERA   USB /dev/video1", font=MONO_S, fg=DIM,
-         bg=PANEL, anchor="w").pack(fill="x", padx=10, pady=(8, 4))
-cv_qr = tk.Label(p1, bg="#05070a"); cv_qr.pack(fill="both", expand=True,
-                                               padx=10, pady=(0, 10))
-# --- Pi camera
-p2 = panel(left); p2.pack(fill="both", expand=True, pady=(12, 0))
-tk.Label(p2, text="PI CAMERA   speckle path, lensless", font=MONO_S, fg=DIM,
-         bg=PANEL, anchor="w").pack(fill="x", padx=10, pady=(8, 4))
-cv_pi = tk.Label(p2, bg="#05070a"); cv_pi.pack(fill="both", expand=True,
-                                               padx=10, pady=(0, 10))
+# Two cameras, two equal halves. pack(expand=True) let the QR feed win the
+# whole column: a Label holding an image asks for the image's size, so the
+# larger frame simply took the space and the Pi camera was squeezed to nothing.
+# grid with a uniform group splits the column by weight instead of by content,
+# and pack_propagate(False) on each holder stops the image driving the size at
+# all -- the layout decides how big the picture may be, not the other way round.
+left.columnconfigure(0, weight=1)
+left.rowconfigure(0, weight=1, uniform="cams")
+left.rowconfigure(1, weight=1, uniform="cams")
+
+def camera_pane(row, title, pad=(0, 0)):
+    pane = panel(left)
+    pane.grid(row=row, column=0, sticky="nsew", pady=pad)
+    tk.Label(pane, text=title, font=MONO_S, fg=DIM, bg=PANEL,
+             anchor="w").pack(fill="x", padx=10, pady=(8, 4))
+    hold = tk.Frame(pane, bg="#05070a")
+    hold.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+    hold.pack_propagate(False)
+    lab = tk.Label(hold, bg="#05070a")
+    lab.pack(fill="both", expand=True)
+    return hold, lab
+
+hold_qr, cv_qr = camera_pane(0, "QR CAMERA   USB /dev/video1")
+hold_pi, cv_pi = camera_pane(1, "PI CAMERA   speckle path, lensless", pad=(12, 0))
 
 # --- transaction
 p3 = panel(right); p3.pack(fill="both", expand=True)
@@ -443,8 +455,9 @@ def tick():
     lbl_stage.config(text=S.stage, fg=STAGE_COLOUR.get(S.stage, INK))
     lbl_demo.config(text="DEMO GATE ON" if S.demo else "")
 
-    for widget, frame in ((cv_qr, S.frame_qr), (cv_pi, S.frame_pi)):
-        ph = to_photo(frame, widget.winfo_width(), widget.winfo_height())
+    for holder, widget, frame in ((hold_qr, cv_qr, S.frame_qr),
+                                  (hold_pi, cv_pi, S.frame_pi)):
+        ph = to_photo(frame, holder.winfo_width() - 4, holder.winfo_height() - 4)
         if ph is not None:
             widget.configure(image=ph); widget.image = ph
 

@@ -25,7 +25,13 @@ import re
 
 VERSION = 1
 OP_SEND = "eth.send"
-CHUNK = 300                                  # base64 chars per frame, as qr.py
+# 700, not upstream's 300. That number is sized for the DEVICE's 240x240
+# screen showing frames to a cheap webcam. This direction is the reverse: a
+# laptop display showing a frame to a 1280x720 camera, which has far more
+# budget. At 300 a contract call landed at 348 base64 chars -- 48 over -- and
+# animated between two frames for no reason. One still frame is easier to hold
+# a camera against than two that keep swapping.
+CHUNK = 700                                  # base64 chars per frame
 _FRAME = re.compile(r"^p(\d+)of(\d+)\s*(.*)$", re.IGNORECASE | re.DOTALL)
 
 REQUIRED = ("chain", "nonce", "to", "value", "gas", "maxFee", "maxPrio")
