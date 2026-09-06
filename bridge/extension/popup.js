@@ -1,16 +1,25 @@
-const u = document.getElementById("u"), s = document.getElementById("s");
-chrome.storage.local.get("deviceUrl", ({ deviceUrl }) => {
-  u.value = deviceUrl || "http://127.0.0.1:8799";
+const F = ["address", "chainId", "rpcUrl", "deviceUrl"];
+const msg = (t, ok = true) => {
+  const m = document.getElementById("msg");
+  m.textContent = t; m.style.color = ok ? "#5fd39a" : "#f08a7a";
+};
+
+chrome.runtime.sendMessage({ type: "cell:config" }, (r) => {
+  if (!r?.ok) return msg("could not read config", false);
+  for (const k of F) if (r.config[k] != null) document.getElementById(k).value = r.config[k];
 });
-document.getElementById("save").onclick = () =>
-  chrome.storage.local.set({ deviceUrl: u.value.trim() }, () => {
-    s.className = "ok"; s.textContent = "saved";
-  });
+
+document.getElementById("save").onclick = () => {
+  const v = Object.fromEntries(F.map((k) => [k, document.getElementById(k).value.trim()]));
+  if (v.address && !/^0x[0-9a-fA-F]{40}$/.test(v.address))
+    return msg("that is not a 20-byte address", false);
+  chrome.storage.local.set(v, () => msg("saved — reload the dApp tab"));
+};
+
 document.getElementById("probe").onclick = () => {
-  s.className = ""; s.textContent = "probing…";
+  msg("probing…");
   chrome.runtime.sendMessage({ type: "cell:probe" }, (r) => {
-    if (!r?.ok) { s.className = "bad"; s.textContent = r?.error || "unreachable"; return; }
-    s.className = "ok";
-    s.textContent = `${r.info.device}\n${r.info.address}\ngate: ${r.info.gate}\n${r.info.warning}`;
+    if (!r?.ok) return msg("device unreachable\n" + (r?.error || ""), false);
+    msg("device: " + JSON.stringify(r.info).slice(0, 120));
   });
 };

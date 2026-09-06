@@ -120,32 +120,60 @@ function overlay(req, frames, digest, lines) {
   });
 }
 
-// ---------------------------------------------------------------- wrapper ---
+// --------------------------------------------------------------- provider ---
+// CELL is announced as its own wallet rather than wrapping someone else's.
+// That is the whole point of an airgapped signer: there is no hot wallet in
+// this browser to wrap, and nothing here can spend. What this file holds is an
+// ADDRESS -- the one the device derived -- exactly as a watch-only wallet does.
+//
+//   reads and broadcast   -> a public node, via the service worker
+//   eth_accounts          -> the configured address
+//   eth_sendTransaction   -> QR out, signature back, then broadcast
+
 const hexToBig = (v) => (v == null ? 0n : BigInt(v));
 
-async function interceptSend(provider, params) {
-  const tx = params[0] || {};
+let CONFIG = { address: "", chainId: "0x1" };
+toBackground({ type: "cell:config" }).then((r) => {
+  if (r?.ok) CONFIG = { ...CONFIG, ...r.config };
+});
+
+async function rpc(method, params) {
+  const r = await toBackground({ type: "cell:rpc", method, params });
+  if (!r?.ok) throw Object.assign(new Error(r?.error || "rpc failed"), { code: r?.code ?? -32603 });
+  return r.result;
+}
+
+function needAddress() {
+  if (!CONFIG.address) {
+    throw Object.assign(new Error(
+      "No CELL address configured. Open the extension and paste the address " +
+      "your device holds -- the browser never sees a key, only which account " +
+      "to build transactions for."), { code: 4100 });
+  }
+  return CONFIG.address;
+}
+
+async function sendTransaction(tx = {}) {
   if (tx.data && tx.data !== "0x") {
     throw Object.assign(new Error(
       "CELL refuses transactions carrying calldata. It signs value transfers, " +
       "which it can render in full; it cannot render a contract call as " +
-      "something you could evaluate. Use your normal wallet for this one."),
+      "something you could evaluate. Registering a name is a contract call."),
       { code: 4100 });
   }
-  const call = (method, ps) => provider.request({ method, params: ps });
-  const [chainIdHex, nonceHex, feeHistoryPrio] = await Promise.all([
-    call("eth_chainId", []),
-    call("eth_getTransactionCount", [tx.from, "pending"]),
-    call("eth_maxPriorityFeePerGas", []).catch(() => "0x5f5e100"),
+  const from = tx.from || needAddress();
+  const [nonceHex, prioHex, block] = await Promise.all([
+    rpc("eth_getTransactionCount", [from, "pending"]),
+    rpc("eth_maxPriorityFeePerGas", []).catch(() => "0x5f5e100"),
+    rpc("eth_getBlockByNumber", ["latest", false]),
   ]);
-  const block = await call("eth_getBlockByNumber", ["latest", false]);
   const base = hexToBig(block?.baseFeePerGas ?? "0x0");
-  const prio = hexToBig(tx.maxPriorityFeePerGas ?? feeHistoryPrio);
+  const prio = hexToBig(tx.maxPriorityFeePerGas ?? prioHex);
   const maxFee = hexToBig(tx.maxFeePerGas ?? (base * 2n + prio));
   const gas = hexToBig(tx.gas ?? "0x5208");
 
   const req = wire.build({
-    chainId: parseInt(chainIdHex, 16),
+    chainId: parseInt(CONFIG.chainId, 16),
     nonce: parseInt(nonceHex, 16),
     to: toChecksumAddress(tx.to),
     value: hexToBig(tx.value ?? "0x0"),
@@ -165,27 +193,86 @@ async function interceptSend(provider, params) {
   ];
   const out = await overlay(req, frames, digest, lines);
   if (out.cancelled) throw Object.assign(new Error("CELL: cancelled"), { code: 4001 });
-  return call("eth_sendRawTransaction", [out.raw]);
+  return rpc("eth_sendRawTransaction", [out.raw]);
 }
 
-function wrap(provider) {
-  if (!provider || provider.__cellWrapped) return provider;
-  const original = provider.request.bind(provider);
-  provider.request = async (args) => {
-    if (args?.method === "eth_sendTransaction") return interceptSend({ request: original }, args.params || []);
-    return original(args);
-  };
-  provider.__cellWrapped = true;
-  console.info("[CELL bridge] wrapped window.ethereum — value transfers route to the device");
-  return provider;
-}
+const listeners = new Map();
+const provider = {
+  isCELL: true,
+  async request(args = {}) {
+    const { method, params = [] } = args;
+    switch (method) {
+      case "eth_requestAccounts":
+      case "eth_accounts":
+        return [needAddress()];
+      case "eth_chainId":
+        return CONFIG.chainId;
+      case "net_version":
+        return String(parseInt(CONFIG.chainId, 16));
+      case "eth_sendTransaction":
+        return sendTransaction(params[0]);
+      case "wallet_switchEthereumChain":
+        // Honest refusal. The chain is configured against the address the
+        // device holds; silently accepting and then signing for a different
+        // one is the failure this whole design exists to prevent.
+        throw Object.assign(new Error(
+          "CELL signs for the chain it was configured with. Change it in the " +
+          "extension, not from the page."), { code: 4902 });
+      case "personal_sign":
+      case "eth_sign":
+      case "eth_signTypedData_v4":
+        throw Object.assign(new Error(
+          "CELL signs transactions it can render, not arbitrary messages."),
+          { code: 4200 });
+      default:
+        return rpc(method, params);
+    }
+  },
+  on(ev, fn) { listeners.set(fn, ev); return provider; },
+  removeListener(fn) { listeners.delete(fn); return provider; },
+  // Some dApps still call these directly.
+  async enable() { return provider.request({ method: "eth_requestAccounts" }); },
+  send(a, b) {
+    if (typeof a === "string") return provider.request({ method: a, params: b });
+    return provider.request(a);
+  },
+  sendAsync(payload, cb) {
+    provider.request(payload).then(
+      (result) => cb(null, { id: payload.id, jsonrpc: "2.0", result }),
+      (error) => cb(error));
+  },
+};
 
-let held = window.ethereum;
-if (held) wrap(held);
-try {
-  Object.defineProperty(window, "ethereum", {
-    configurable: true,
-    get: () => held,
-    set: (v) => { held = wrap(v); },
-  });
-} catch { /* a wallet that locked the property; the eager wrap above still applies */ }
+// EIP-6963: the modern way to be discovered without fighting over
+// window.ethereum. A dApp that supports it lists CELL alongside any other
+// wallet the user has, instead of one clobbering the other.
+const ICON = "data:image/svg+xml;base64," + btoa(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96">` +
+  `<rect width="96" height="96" rx="20" fill="#0f1318"/>` +
+  `<circle cx="48" cy="48" r="20" fill="none" stroke="#c8442e" stroke-width="6"/>` +
+  `<circle cx="48" cy="48" r="7" fill="#c8442e"/></svg>`);
+
+const info = Object.freeze({
+  uuid: (crypto.randomUUID && crypto.randomUUID()) || "cell-" + Date.now(),
+  name: "CELL",
+  icon: ICON,
+  rdns: "life.proof.cell",
+});
+const announce = () => window.dispatchEvent(new CustomEvent(
+  "eip6963:announceProvider", { detail: Object.freeze({ info, provider }) }));
+window.addEventListener("eip6963:requestProvider", announce);
+announce();
+
+// And the legacy slot, but only if it is free. Sites like wei.domains read
+// window.ethereum directly; stamping over a real wallet that a user might
+// still want is not ours to do.
+if (!window.ethereum) {
+  try {
+    Object.defineProperty(window, "ethereum", {
+      configurable: true, get: () => provider, set: () => {},
+    });
+  } catch { window.ethereum = provider; }
+  console.info("[CELL] provider installed as window.ethereum");
+} else {
+  console.info("[CELL] announced via EIP-6963; window.ethereum left to the existing wallet");
+}

@@ -1,21 +1,34 @@
-// The only part of the extension that can reach the mock device.
+// The service worker. Two jobs, and neither involves a key.
 //
-// A page on https://wei.domains cannot fetch http://127.0.0.1 -- mixed content
-// is blocked before the request leaves the tab. A service worker is not
-// subject to that, so every device call is relayed through here. When the real
-// CELL is in use this path goes away entirely: the transaction crosses as QR
-// pixels and nothing is fetched at all.
+// RPC. The provider in the page answers eth_accounts and eth_chainId from
+// config, and sends everything else here to be forwarded to a public node.
+// That is what makes the extension walletless: it can read the chain and
+// broadcast to it without holding anything that can spend.
+//
+// DEVICE. A page on https://wei.domains cannot fetch http://127.0.0.1 -- mixed
+// content is blocked before the request leaves the tab. A service worker is
+// not subject to that. With the real CELL this path is only used by the mock;
+// a physical device is reached with pixels and there is nothing to fetch.
 
-const DEFAULT_DEVICE = "http://127.0.0.1:8799";
+const DEFAULTS = {
+  deviceUrl: "http://127.0.0.1:8799",
+  // wei.domains is Ethereum mainnet. Its own scripts use these two nodes.
+  rpcUrl: "https://ethereum-rpc.publicnode.com",
+  chainId: "0x1",
+  // No key here, and none anywhere in the browser. This is the address the
+  // DEVICE holds, typed in once, the way a watch-only wallet is set up.
+  address: "",
+};
 
-async function deviceURL() {
-  const { deviceUrl } = await chrome.storage.local.get("deviceUrl");
-  return deviceUrl || DEFAULT_DEVICE;
+async function cfg() {
+  const got = await chrome.storage.local.get(Object.keys(DEFAULTS));
+  return { ...DEFAULTS, ...Object.fromEntries(
+    Object.entries(got).filter(([, v]) => v !== undefined && v !== "")) };
 }
 
-async function call(path, body) {
-  const url = (await deviceURL()) + path;
-  const res = await fetch(url, {
+async function device(path, body) {
+  const { deviceUrl } = await cfg();
+  const res = await fetch(deviceUrl + path, {
     method: body ? "POST" : "GET",
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -28,14 +41,37 @@ async function call(path, body) {
   return json;
 }
 
+let rpcId = 0;
+async function rpc(method, params) {
+  const { rpcUrl } = await cfg();
+  const res = await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params: params || [] }),
+  });
+  const json = await res.json();
+  if (json.error) {
+    // Surface the node's own code: a dApp distinguishes "insufficient funds"
+    // from "nonce too low" by it, and flattening both to a string breaks that.
+    const e = new Error(json.error.message || "rpc error");
+    e.code = json.error.code;
+    throw e;
+  }
+  return json.result;
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   (async () => {
     try {
-      if (msg.type === "cell:probe") reply({ ok: true, info: await call("/") });
-      else if (msg.type === "cell:sign") reply({ ok: true, result: await call("/", { request: msg.request }) });
-      else reply({ ok: false, error: `unknown message ${msg.type}` });
+      switch (msg.type) {
+        case "cell:probe":  return reply({ ok: true, info: await device("/") });
+        case "cell:sign":   return reply({ ok: true, result: await device("/", { request: msg.request }) });
+        case "cell:rpc":    return reply({ ok: true, result: await rpc(msg.method, msg.params) });
+        case "cell:config": return reply({ ok: true, config: await cfg() });
+        default:            return reply({ ok: false, error: `unknown message ${msg.type}` });
+      }
     } catch (e) {
-      reply({ ok: false, error: String(e.message || e) });
+      reply({ ok: false, error: String(e.message || e), code: e.code });
     }
   })();
   return true;                      // keep the channel open for the async reply
