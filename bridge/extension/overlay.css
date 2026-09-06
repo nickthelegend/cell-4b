@@ -25,3 +25,5 @@
 .cellbr-err{color:#f08a7a;font-size:12px;margin-top:10px;white-space:pre-wrap}
 .cellbr-ok{color:#5fd39a}
 .cellbr-note{color:#7c8896;font-size:11px;margin-top:12px;line-height:1.5}
+.cellbr-vid{width:100%;max-height:240px;border-radius:8px;margin-top:10px;
+  background:#05070a;object-fit:cover}

@@ -59,7 +59,11 @@ function overlay(req, frames, digest, lines) {
           <button class="cellbr-btn" data-act="cancel">Cancel</button>
         </div>
         <div class="cellbr-row">
-          <input class="cellbr-in" data-act="raw" placeholder="or paste the signed transaction hex from the device">
+          <button class="cellbr-btn" data-act="scan">Scan signature with camera</button>
+        </div>
+        <video class="cellbr-vid" data-act="video" playsinline muted hidden></video>
+        <div class="cellbr-row">
+          <input class="cellbr-in" data-act="raw" placeholder="or paste / type the signed transaction hex">
         </div>
         <div class="cellbr-err" hidden></div>
         <div class="cellbr-note">The device rebuilds this transaction from the fields
@@ -88,7 +92,17 @@ function overlay(req, frames, digest, lines) {
     paint();
     const timer = frames.length > 1 ? setInterval(paint, 500) : null;
 
-    const done = (v) => { if (timer) clearInterval(timer); root.remove(); resolve(v); };
+    // Declared here, not beside the scanner below: done() closes over it, and
+    // a `const` further down would be in its temporal dead zone -- the camera
+    // would keep running after the overlay was dismissed, with the light on.
+    let stream = null;
+    const stopCam = () => { stream?.getTracks().forEach((t) => t.stop()); stream = null; };
+    const done = (v) => {
+      if (timer) clearInterval(timer);
+      stopCam();
+      root.remove();
+      resolve(v);
+    };
     root.addEventListener("click", async (ev) => {
       const act = ev.target?.dataset?.act;
       if (act === "cancel") done({ cancelled: true });
@@ -109,6 +123,43 @@ function overlay(req, frames, digest, lines) {
         say(`signed at ${r.result.tier} tier`, true);
         setTimeout(() => done({ raw: r.result.raw }), 900);
       }
+    });
+
+    // Read the signature back off the device's screen. The QR carries a public
+    // signed transaction, so this camera never sees anything secret -- it is a
+    // convenience over typing 236 hex digits, not a security boundary.
+    root.querySelector('[data-act="scan"]').addEventListener("click", async (ev) => {
+      const btn = ev.currentTarget;
+      const vid = root.querySelector('[data-act="video"]');
+      if (!("BarcodeDetector" in window)) {
+        return say("this browser has no BarcodeDetector — type the blocks instead, "
+                   + "or use Chrome/Brave on macOS, Android or ChromeOS");
+      }
+      if (stream) { stopCam(); vid.hidden = true; btn.textContent = "Scan signature with camera"; return; }
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1280 } } });
+      } catch (e) {
+        return say("camera refused: " + (e.message || e));
+      }
+      vid.srcObject = stream; vid.hidden = false; await vid.play();
+      btn.textContent = "Stop camera";
+      say("point at the QR on the device's screen");
+      const det = new BarcodeDetector({ formats: ["qr_code"] });
+      const tick = async () => {
+        if (!stream) return;
+        try {
+          const found = await det.detect(vid);
+          const hit = found.map((f) => f.rawValue).find((v) => /^0x[0-9a-fA-F]{100,}$/.test(v.trim()));
+          if (hit) {
+            stopCam(); vid.hidden = true;
+            say("signature captured", true);
+            return done({ raw: hit.trim() });
+          }
+        } catch { /* a frame the detector could not read; try the next */ }
+        setTimeout(tick, 120);
+      };
+      tick();
     });
     root.querySelector('[data-act="raw"]').addEventListener("keydown", (ev) => {
       if (ev.key !== "Enter") return;
