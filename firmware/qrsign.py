@@ -20,29 +20,7 @@ for k in ("chain", "nonce", "to", "value", "gas", "maxFee", "maxPrio"):
     print(f"       {k:<8} {tx[k]}")
 
 
-SEEDFILE = os.path.expanduser("~/.cell/seed")
-PATH = "m/44\'/60\'/0\'/0/0"
-
-
-def device_key():
-    """The key the device was provisioned with, derived on demand.
-
-    Never a constant. A hardcoded test key is fine for proving a code path and
-    catastrophic the moment someone funds the address it derives to, so this
-    reads the seed the device generated for itself and refuses if there is not
-    one -- an explicit failure beats silently signing as somebody else.
-    """
-    import bip32
-    if not os.path.exists(SEEDFILE):
-        raise RuntimeError(
-            "no seed on this device. Run provision_cell.py first -- it "
-            "generates one from the kernel CSPRNG and shows you the words.")
-    with open(SEEDFILE) as f:
-        mn = f.read().strip()
-    node = bip32.from_mnemonic(mn).derive(PATH)
-    if node.seckey is None:
-        raise RuntimeError("derived a watch-only node")
-    return node.seckey
+from devkey import device_key
 
 
 import eth
