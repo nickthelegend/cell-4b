@@ -18,12 +18,18 @@ const DEFAULTS = {
   // No key here, and none anywhere in the browser. This is the address the
   // DEVICE holds, typed in once, the way a watch-only wallet is set up.
   address: "",
+  // Off unless the owner turns it on, per session of their own choosing. A
+  // device that blind-signs by default is a device that does not render.
+  blind: false,
 };
 
 async function cfg() {
   const got = await chrome.storage.local.get(Object.keys(DEFAULTS));
+  // `false` is a meaningful stored value for blind; filtering falsy would make
+  // it impossible to ever turn back off.
   return { ...DEFAULTS, ...Object.fromEntries(
-    Object.entries(got).filter(([, v]) => v !== undefined && v !== "")) };
+    Object.entries(got).filter(([k, v]) =>
+      v !== undefined && (k === "blind" || v !== ""))) };
 }
 
 async function device(path, body) {

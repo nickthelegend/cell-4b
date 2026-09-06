@@ -205,11 +205,20 @@ function needAddress() {
 }
 
 async function sendTransaction(tx = {}) {
-  if (tx.data && tx.data !== "0x") {
+  // Re-read config here rather than trusting what was fetched at page load.
+  // Blind signing is the setting most likely to be changed with the dApp
+  // already open, and "you must reload the tab first" is exactly the kind of
+  // instruction people skip and then misread the result of.
+  const fresh = await toBackground({ type: "cell:config" });
+  if (fresh?.ok) CONFIG = { ...CONFIG, ...fresh.config };
+
+  const hasData = !!(tx.data && tx.data !== "0x");
+  if (hasData && !CONFIG.blind) {
     throw Object.assign(new Error(
       "CELL refuses transactions carrying calldata. It signs value transfers, " +
       "which it can render in full; it cannot render a contract call as " +
-      "something you could evaluate. Registering a name is a contract call."),
+      "something you could evaluate. Turn on blind signing in the extension " +
+      "if you accept signing a call the device cannot explain."),
       { code: 4100 });
   }
   const from = tx.from || needAddress();
@@ -221,7 +230,7 @@ async function sendTransaction(tx = {}) {
   const base = hexToBig(block?.baseFeePerGas ?? "0x0");
   const prio = hexToBig(tx.maxPriorityFeePerGas ?? prioHex);
   const maxFee = hexToBig(tx.maxFeePerGas ?? (base * 2n + prio));
-  const gas = hexToBig(tx.gas ?? "0x5208");
+  const gas = hexToBig(tx.gas ?? (hasData ? "0x30d40" : "0x5208"));
 
   const req = wire.build({
     chainId: parseInt(CONFIG.chainId, 16),
@@ -229,11 +238,22 @@ async function sendTransaction(tx = {}) {
     to: toChecksumAddress(tx.to),
     value: hexToBig(tx.value ?? "0x0"),
     gas, maxFee, maxPrio: prio,
+    data: hasData ? tx.data : undefined,
   });
   const digest = await wire.digest(req);
   const frames = wire.encode(req);
   const eth = Number(BigInt(req.value)) / 1e18;
-  const lines = [
+  const lines = hasData ? [
+    `!! UNREAD CONTRACT CALL !!`,
+    `  the device cannot explain this`,
+    ``,
+    `  to       ${req.to.slice(0, 26)}`,
+    `           ${req.to.slice(26)}`,
+    `  value    ${eth} ETH`,
+    `  selector ${req.data.slice(0, 10)}`,
+    `  data     ${(req.data.length - 2) / 2} bytes`,
+    `  nonce    ${req.nonce}`,
+  ] : [
     `SEND ON CHAIN ${req.chain}`,
     `  amount   ${eth} ETH`,
     `  to`,

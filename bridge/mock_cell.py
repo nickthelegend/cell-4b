@@ -63,7 +63,7 @@ def render(tx: eth.EthTransaction) -> list[str]:
 
 
 def handle(req: dict) -> dict:
-    tx = eth.EthTransaction(
+    common = dict(
         chain_id=wire.to_int(req["chain"]),
         nonce=wire.to_int(req["nonce"]),
         max_priority_fee_per_gas=wire.to_int(req["maxPrio"]),
@@ -72,7 +72,17 @@ def handle(req: dict) -> dict:
         to=req["to"],
         value=wire.to_int(req["value"]),
     )
-    lines = render(tx)
+    blind = bool(req.get("blind")) and req.get("data") not in ("", "0x", None)
+    if blind:
+        # The same split the device makes: a contract call is a different type
+        # with a different renderer, not an EthTransaction with a field set.
+        import blindtx
+        tx = blindtx.BlindContractCall(
+            data=bytes.fromhex(req["data"].removeprefix("0x")), **common)
+        lines = tx.render()
+    else:
+        tx = eth.EthTransaction(**common)
+        lines = render(tx)
     print("\n  ---- the device would show ----")
     for ln in lines:
         print(f"  | {ln}")
@@ -81,12 +91,16 @@ def handle(req: dict) -> dict:
     if GATE == "refuse":
         return {"ok": False, "error": "gate refused: no sample detected",
                 "display": lines}
-    r, s, yp = eth.sign(tx, DEMO_KEY)
+    if blind:
+        import blindtx
+        r, s, yp = blindtx.sign(tx, DEMO_KEY)
+    else:
+        r, s, yp = eth.sign(tx, DEMO_KEY)
     raw = tx.encode_signed(r, s, yp)
     return {
         "ok": True,
         "display": lines,
-        "tier": GATE,
+        "tier": GATE + (" (BLIND)" if blind else ""),
         "from": DEMO_ADDR,
         "txid": tx.txid(r, s, yp),
         "raw": "0x" + raw.hex(),

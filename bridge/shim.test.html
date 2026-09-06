@@ -12,6 +12,25 @@ window.addEventListener("message", async (ev) => {
   if (ev.source !== window || ev.data?.channel !== "cell-bridge") return;
   const { id, payload } = ev.data;
   let reply;
+  if (payload.type === "cell:config") {
+    window.postMessage({ channel: "cell-bridge-reply", id,
+      reply: { ok: true, config: { address: window.__ADDR,
+        chainId: "0x14a34", blind: window.__BLIND === true } } }, "*");
+    return;
+  }
+  if (payload.type === "cell:rpc") {
+    const R = {
+      eth_chainId: "0x14a34",
+      eth_getTransactionCount: "0x7",
+      eth_maxPriorityFeePerGas: "0xf4240",
+      eth_getBlockByNumber: { baseFeePerGas: "0x3b9aca00" },
+      eth_sendRawTransaction: "0xBROADCAST_OK",
+    };
+    if (payload.method === "eth_sendRawTransaction") SENT.push(payload.params[0]);
+    window.postMessage({ channel: "cell-bridge-reply", id,
+      reply: { ok: true, result: R[payload.method] } }, "*");
+    return;
+  }
   try {
     const res = await fetch("http://127.0.0.1:8799/", {
       method: payload.type === "cell:probe" ? "GET" : "POST",
@@ -28,6 +47,8 @@ window.addEventListener("message", async (ev) => {
 
 // A stub wallet. Answers the reads the shim needs, and records what it is
 // asked to broadcast.
+window.__ADDR = "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf";
+window.__BLIND = false;
 const SENT = [];
 window.ethereum = {
   isMetaMask: true,
@@ -39,6 +60,7 @@ window.ethereum = {
       case "eth_maxPriorityFeePerGas": return "0xf4240";
       case "eth_getBlockByNumber": return { baseFeePerGas: "0x3b9aca00" };
       case "eth_sendRawTransaction": SENT.push(params[0]); return "0xBROADCAST_OK";
+      case "eth_sendTransaction": throw new Error("the stub wallet must never be asked to send");
       default: throw new Error("stub wallet: unexpected " + method);
     }
   },
@@ -50,13 +72,22 @@ window.__SENT = SENT;
 const o = document.getElementById("o"); o.textContent = "";
 const say = (m, c) => o.innerHTML += `<span class="${c||''}">${m}</span>\n`;
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
-await wait(400);
+await wait(500);
 
-say(`wrapper installed: ${window.ethereum.__cellWrapped === true}`,
-    window.ethereum.__cellWrapped ? "ok" : "bad");
+// EIP-6963: exactly how a dApp finds a wallet that is not window.ethereum.
+let cell = null;
+window.addEventListener("eip6963:announceProvider", (e) => {
+  if (e.detail?.info?.rdns === "life.proof.cell") cell = e.detail.provider;
+});
+window.dispatchEvent(new Event("eip6963:requestProvider"));
+await wait(300);
+say(`announced over EIP-6963: ${!!cell}`, cell ? "ok" : "bad");
+if (!cell) { say("cannot continue without the provider", "bad"); throw new Error("no provider"); }
+const accounts = await cell.request({ method: "eth_accounts" });
+say(`eth_accounts -> ${accounts[0]}`, accounts[0] === window.__ADDR ? "ok" : "bad");
 
 // ---- 1. a plain transfer must be intercepted ----------------------------
-const pending = window.ethereum.request({
+const pending = cell.request({
   method: "eth_sendTransaction",
   params: [{ from: "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
              to: "0x742d35cc6634c0532925a3b844bc454e4438f44e",   // lowercase on purpose
@@ -100,8 +131,8 @@ say(`raw tx handed to the wallet: ${window.__SENT[0] ? window.__SENT[0].slice(0,
 // ---- 2. calldata must be refused, without ever reaching the device ------
 let refused = null;
 try {
-  await window.ethereum.request({ method: "eth_sendTransaction", params: [{
-    from: "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
+  await cell.request({ method: "eth_sendTransaction", params: [{
+    from: window.__ADDR,
     to: "0x742d35cc6634c0532925a3b844bc454e4438f44e",
     value: "0x0", data: "0xa9059cbb0000000000000000000000000000" }] });
 } catch (e) { refused = e; }
@@ -111,7 +142,50 @@ say(`no second overlay opened: ${document.querySelectorAll(".cellbr-root").lengt
     document.querySelectorAll(".cellbr-root").length === 0 ? "ok" : "bad");
 
 // ---- 3. everything else must pass straight through ----------------------
-const chain = await window.ethereum.request({ method: "eth_chainId" });
+const chain = await cell.request({ method: "eth_chainId" });
 say(`passthrough eth_chainId: ${chain}`, chain === "0x14a34" ? "ok" : "bad");
+// ---- 4. calldata with blind OFF is refused before the device is asked ----
+window.__BLIND = false;
+let r4 = null;
+try {
+  await cell.request({ method: "eth_sendTransaction", params: [{
+    from: window.__ADDR, to: "0x0000C82AA4D72871568eF3859D2b0E7CF37e45f2",
+    value: "0x0", data: "0xf14fcbc8" + "ab".repeat(32) }] });
+} catch (e) { r4 = e; }
+say(`\nblind OFF -> calldata refused: ${!!r4}`, r4 ? "ok" : "bad");
+if (r4) say(`  ${r4.message.slice(0, 74)}…`);
+
+// ---- 5. blind ON: it reaches the device and comes back signed ----
+window.__BLIND = true;
+location.hash = "blind";           // marker for the log
+const p5 = cell.request({ method: "eth_sendTransaction", params: [{
+  from: window.__ADDR, to: "0x0000C82AA4D72871568eF3859D2b0E7CF37e45f2",
+  value: "0x71afd498d0000", data: "0xf14fcbc8" + "ab".repeat(32) }] });
+await wait(900);
+const ov = document.querySelector(".cellbr-root");
+say(`blind ON  -> overlay opened: ${!!ov}`, ov ? "ok" : "bad");
+if (ov) {
+  const panel = ov.querySelector(".cellbr-lines").textContent;
+  const warned = panel.includes("UNREAD CONTRACT CALL");
+  say(`  browser warns before sending: ${warned}`, warned ? "ok" : "bad");
+  say(`  selector shown: ${/0xf14fcbc8/.test(panel)}`, /0xf14fcbc8/.test(panel) ? "ok" : "bad");
+  ov.querySelector('[data-act="mock"]').click();
+  let dev = "", got = false;
+  for (let i = 0; i < 80 && !got; i++) {
+    dev = document.querySelector(".cellbr-lines")?.textContent ?? dev;
+    got = dev.includes("UNREAD CONTRACT CALL") && dev.includes("hash");
+    if (!got) await wait(60);
+  }
+  say(`  device render came back: ${got}`, got ? "ok" : "bad");
+  if (got) say(dev.split("\n").slice(0, 3).map(l => "    | " + l).join("\n"));
+}
+let h5 = null, e5 = null;
+try { h5 = await Promise.race([p5, wait(9000).then(() => { throw new Error("timed out"); })]); }
+catch (e) { e5 = e.message; }
+say(`  broadcast: ${h5 ?? "— " + e5}`, h5 === "0xBROADCAST_OK" ? "ok" : "bad");
+const rawBlind = window.__SENT[1] || "";
+say(`  raw carries calldata: ${rawBlind.includes("f14fcbc8")}`,
+    rawBlind.includes("f14fcbc8") ? "ok" : "bad");
+
 say(`\ndone`, "ok");
 </script>

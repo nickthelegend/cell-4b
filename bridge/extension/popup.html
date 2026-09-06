@@ -34,6 +34,16 @@
 <label>Device (mock only)</label>
 <input id="deviceUrl" spellcheck="false">
 
+<label style="margin-top:14px">Contract calls</label>
+<div style="display:flex;align-items:flex-start;gap:8px">
+  <input type="checkbox" id="blind" style="width:auto;margin-top:2px">
+  <span style="font-size:11px;color:#7c8896;line-height:1.45">
+    Allow <b style="color:#f08a7a">blind signing</b> — the device signs calls it
+    cannot read. It shows the recipient, value, selector and a hash of the
+    calldata, and says the rest is unread.
+  </span>
+</div>
+
 <button id="save">Save</button>
 <button id="probe" class="ghost">Probe device</button>
 <div id="msg"></div>

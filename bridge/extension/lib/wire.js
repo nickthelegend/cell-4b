@@ -8,8 +8,8 @@ export const CHUNK = 300;
 const hex = (v) => "0x" + BigInt(v).toString(16);
 
 /** Transaction FIELDS, never a digest. The device rebuilds and rehashes. */
-export function build({ chainId, nonce, to, value, gas, maxFee, maxPrio }) {
-  return {
+export function build({ chainId, nonce, to, value, gas, maxFee, maxPrio, data }) {
+  const req = {
     v: VERSION, op: OP_SEND,
     chain: Number(chainId),
     nonce: Number(nonce),
@@ -19,6 +19,10 @@ export function build({ chainId, nonce, to, value, gas, maxFee, maxPrio }) {
     maxFee: hex(maxFee),
     maxPrio: hex(maxPrio),
   };
+  // `blind` is not decoration: the device refuses calldata that is not marked,
+  // so a contract call cannot arrive by a page omitting a flag.
+  if (data && data !== "0x") { req.data = data; req.blind = true; }
+  return req;
 }
 
 // Sorted keys and no whitespace, so the digest matches Python's json.dumps
