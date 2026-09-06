@@ -127,7 +127,7 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid var(--line);
 
   <section>
     <div class="eyebrow">Log</div>
-    <div class="panel"><pre id="log">waiting for the CELL provider to announce itself\u2026</pre></div>
+    <div class="panel"><pre id="log">waiting for the CELL provider to announce itself&hellip;</pre></div>
   </section>
 
   <footer>
@@ -150,7 +150,7 @@ function say(msg, cls) {
   log.scrollTop = log.scrollHeight;
 }
 
-let provider = null, account = null;
+let provider = null, account = null, chainOk = false;
 
 // EIP-6963: wallets announce themselves, we do not hunt for window.ethereum.
 window.addEventListener("eip6963:announceProvider", (e) => {
@@ -193,13 +193,17 @@ async function connect() {
   account = accs[0];
   $("vAddr").textContent = account;
   const cid = await provider.request({ method: "eth_chainId" });
-  $("pChain").textContent = cid === CHAIN ? `Sepolia \u00b7 ${CHAIN_N}` : `wrong chain \u00b7 ${cid}`;
-  $("pChain").className = "pill " + (cid === CHAIN ? "on" : "off");
+  chainOk = cid === CHAIN;
+  $("pChain").textContent = chainOk ? `Sepolia \u00b7 ${CHAIN_N}` : `wrong chain \u00b7 ${cid}`;
+  $("pChain").className = "pill " + (chainOk ? "on" : "off");
   say("connected as " + account);
-  if (cid !== CHAIN) say(`Set the extension to Sepolia (${CHAIN}) and reload.`, "r");
+  if (!chainOk) {
+    say(`This bench is Sepolia. The extension is on ${cid}.`, "r");
+    say(`Open the extension, set the chain to Sepolia (${CHAIN}), save, reload.`, "r");
+  }
   await refresh();
   say("balance " + $("vBal").textContent);
-  $("go").textContent = "Send via CELL";
+  $("go").textContent = chainOk ? "Send via CELL" : "Wrong chain \u2014 fix the extension";
 }
 
 $("send").addEventListener("submit", async (ev) => {
@@ -208,6 +212,10 @@ $("send").addEventListener("submit", async (ev) => {
   btn.disabled = true;
   try {
     if (!account) { await connect(); return; }
+    if (!chainOk) {
+      throw new Error("wrong chain. Set the extension to Sepolia and reload " +
+                      "-- signing this here would build for the wrong network.");
+    }
     const to = $("to").value.trim();
     if (!/^0x[0-9a-fA-F]{40}$/.test(to)) throw new Error("that is not a 20-byte address");
     const eth = Number($("amt").value);
