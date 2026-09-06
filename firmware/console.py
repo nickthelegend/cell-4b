@@ -12,7 +12,7 @@ it is on -- a gate you can quietly bypass while filming is worse than no gate.
 """
 from __future__ import annotations
 
-import queue, sys, threading, time, tkinter as tk
+import os, queue, sys, threading, time, tkinter as tk
 from dataclasses import dataclass, field
 
 sys.path.insert(0, "upstream")
@@ -40,6 +40,7 @@ class State:
     display: list = field(default_factory=list)
     gate: dict = field(default_factory=dict)
     result: str = ""
+    raw: str = ""
     result_ok: bool = False
     demo: bool = False
     log: list = field(default_factory=list)
@@ -130,6 +131,32 @@ def run_gate():
 
 
 # ---------------------------------------------------------------- signing ----
+
+SEEDFILE = os.path.expanduser("~/.cell/seed")
+PATH = "m/44\'/60\'/0\'/0/0"
+
+
+def device_key():
+    """The key the device was provisioned with, derived on demand.
+
+    Never a constant. A hardcoded test key is fine for proving a code path and
+    catastrophic the moment someone funds the address it derives to, so this
+    reads the seed the device generated for itself and refuses if there is not
+    one -- an explicit failure beats silently signing as somebody else.
+    """
+    import bip32
+    if not os.path.exists(SEEDFILE):
+        raise RuntimeError(
+            "no seed on this device. Run provision_cell.py first -- it "
+            "generates one from the kernel CSPRNG and shows you the words.")
+    with open(SEEDFILE) as f:
+        mn = f.read().strip()
+    node = bip32.from_mnemonic(mn).derive(PATH)
+    if node.seckey is None:
+        raise RuntimeError("derived a watch-only node")
+    return node.seckey
+
+
 def sign_tx(tx):
     import eth
     for cid, (nm, tk_) in {1: ("Ethereum", "ETH"), 8453: ("Base", "ETH"),
@@ -151,7 +178,7 @@ def sign_tx(tx):
         amount_wei=t.value, destination=t.to, chain_id=t.chain_id,
         chain_name=t.chain_name(), nonce=t.nonce,
         max_fee_wei=t.max_fee_wei()).render()
-    sk = bytes.fromhex("59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")
+    sk = device_key()
     r, s_, y = eth.sign(t, sk)
     return t.txid(r, s_, y), t.encode_signed(r, s_, y).hex(), eth.sender(t, r, s_, y)
 
@@ -179,8 +206,10 @@ def worker(txt):
     try:
         txid, raw, frm = sign_tx(S.tx)
         S.result_ok = True; S.stage = "SIGNED"
+        S.raw = raw
         S.result = (f"SIGNED{'  (DEMO GATE)' if not passed else ''}\n\n"
-                    f"from  {frm}\ntxid  {txid}\n\nraw   {raw[:64]}...")
+                    f"from  {frm}\ntxid  {txid[:34]}...\n\n"
+                    f"scan the code to carry it back")
         S.say("signed")
     except Exception as e:
         S.stage = "REFUSED"; S.result_ok = False
@@ -245,9 +274,14 @@ txt_gate.pack(fill="both", expand=True, padx=12, pady=(0, 10))
 
 # --- result
 p5 = panel(right); p5.pack(fill="both", expand=True, pady=(12, 0))
-txt_res = tk.Label(p5, text="", font=MONO_L, fg=INK, bg=PANEL,
-                   justify="left", anchor="nw", wraplength=520)
-txt_res.pack(fill="both", expand=True, padx=12, pady=10)
+res_wrap = tk.Frame(p5, bg=PANEL); res_wrap.pack(fill="both", expand=True)
+txt_res = tk.Label(res_wrap, text="", font=MONO_L, fg=INK, bg=PANEL,
+                   justify="left", anchor="nw", wraplength=340)
+txt_res.pack(side="left", fill="both", expand=True, padx=12, pady=10)
+# The signature goes home the same way the request came: as pixels. Nothing is
+# transmitted, so the airgap survives the return trip too.
+cv_out = tk.Label(res_wrap, bg=PANEL)
+cv_out.pack(side="right", padx=(0, 12), pady=10)
 
 foot = tk.Frame(root, bg=BG); foot.pack(fill="x", padx=16, pady=(4, 10))
 txt_log = tk.Label(foot, text="", font=MONO_S, fg=DIM, bg=BG, justify="left",
@@ -321,6 +355,21 @@ def tick():
         txt_gate.config(text="\n".join(x for x in gl if x != ""))
 
     txt_res.config(text=S.result, fg=OK if S.result_ok else BAD)
+    if S.raw and getattr(cv_out, "shown", None) != S.raw:
+        try:
+            import segno
+            q = segno.make("0x" + S.raw, error="L")
+            m = np.array(q.matrix, dtype="uint8")
+            m = np.kron(1 - m, np.ones((6, 6), "uint8")) * 255      # scale up
+            m = np.pad(m, 24, constant_values=255)
+            ph = to_photo(np.dstack([m] * 3), 300, 300)
+            cv_out.configure(image=ph); cv_out.image = ph
+            cv_out.shown = S.raw
+        except Exception as e:
+            S.say(f"QR out failed: {type(e).__name__}")
+            cv_out.shown = S.raw
+    elif not S.raw and getattr(cv_out, "shown", None):
+        cv_out.configure(image=""); cv_out.shown = None
     txt_log.config(text="\n".join(S.log[-4:]))
 
     try:
@@ -336,7 +385,7 @@ def on_key(e):
     k = e.keysym.lower()
     if k == "q": root.destroy()
     elif k == "r":
-        S.stage = "SCANNING"; S.tx = {}; S.gate = {}; S.result = ""
+        S.stage = "SCANNING"; S.tx = {}; S.gate = {}; S.result = ""; S.raw = ""
         S.display = []; S.say("rescanning")
     elif k == "d":
         S.demo = not S.demo

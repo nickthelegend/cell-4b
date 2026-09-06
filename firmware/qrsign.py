@@ -1,5 +1,5 @@
 """QR image -> decoded frame -> rebuilt transaction -> signature. No camera."""
-import sys, time, base64, json, re
+import os, sys, time, base64, json, re
 sys.path.insert(0, "upstream")
 import cv2
 
@@ -19,6 +19,32 @@ print(f"  3. CELL-EVM-{tx['v']} frame, op = {tx['op']}")
 for k in ("chain", "nonce", "to", "value", "gas", "maxFee", "maxPrio"):
     print(f"       {k:<8} {tx[k]}")
 
+
+SEEDFILE = os.path.expanduser("~/.cell/seed")
+PATH = "m/44\'/60\'/0\'/0/0"
+
+
+def device_key():
+    """The key the device was provisioned with, derived on demand.
+
+    Never a constant. A hardcoded test key is fine for proving a code path and
+    catastrophic the moment someone funds the address it derives to, so this
+    reads the seed the device generated for itself and refuses if there is not
+    one -- an explicit failure beats silently signing as somebody else.
+    """
+    import bip32
+    if not os.path.exists(SEEDFILE):
+        raise RuntimeError(
+            "no seed on this device. Run provision_cell.py first -- it "
+            "generates one from the kernel CSPRNG and shows you the words.")
+    with open(SEEDFILE) as f:
+        mn = f.read().strip()
+    node = bip32.from_mnemonic(mn).derive(PATH)
+    if node.seckey is None:
+        raise RuntimeError("derived a watch-only node")
+    return node.seckey
+
+
 import eth
 eth.register_chain(84532, "Base Sepolia", "ETH")
 t = eth.EthTransaction(
@@ -37,7 +63,7 @@ print("\n  4. the device rebuilt it from those fields and would show:")
 for l in spend.render():
     print("       | " + l)
 
-sk = bytes.fromhex("59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")
+sk = device_key()
 r, s_, y = eth.sign(t, sk)
 raw = t.encode_signed(r, s_, y).hex()
 print("\n  5. SIGNED on the Pi")
