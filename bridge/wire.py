@@ -36,10 +36,11 @@ class BadPayload(ValueError):
 
 
 def build(*, chain_id: int, nonce: int, to: str, value_wei: int,
-          gas_limit: int, max_fee_wei: int, max_prio_wei: int) -> dict:
+          gas_limit: int, max_fee_wei: int, max_prio_wei: int,
+          data: str = "", blind: bool = False) -> dict:
     """The canonical request object. Integers as hex strings, so a browser's
     Number cannot silently round a wei value past 2^53."""
-    return {
+    req = {
         "v": VERSION,
         "op": OP_SEND,
         "chain": chain_id,
@@ -50,6 +51,12 @@ def build(*, chain_id: int, nonce: int, to: str, value_wei: int,
         "maxFee": hex(max_fee_wei),
         "maxPrio": hex(max_prio_wei),
     }
+    if data and data != "0x":
+        # `blind` is not decoration. parse() refuses calldata without it, so a
+        # contract call cannot arrive by accident or by a page omitting a flag.
+        req["data"] = data
+        req["blind"] = True
+    return req
 
 
 def encode(req: dict, chunk: int = CHUNK) -> list[str]:
@@ -102,11 +109,11 @@ def parse(blob: bytes) -> dict:
     missing = [k for k in REQUIRED if k not in req]
     if missing:
         raise BadPayload(f"missing fields: {', '.join(missing)}")
-    if "data" in req and req["data"] not in ("", "0x", None):
+    if req.get("data") not in ("", "0x", None) and not req.get("blind"):
         raise BadPayload(
-            "payload carries calldata. This device signs value transfers, "
-            "which it can render in full; it cannot render an EVM call as "
-            "something an owner could evaluate.")
+            "payload carries calldata but is not marked blind. This device "
+            "signs value transfers, which it can render in full; a contract "
+            "call has to be requested explicitly and is signed unread.")
     return req
 
 

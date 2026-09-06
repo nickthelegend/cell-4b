@@ -12,7 +12,7 @@ it is on -- a gate you can quietly bypass while filming is worse than no gate.
 """
 from __future__ import annotations
 
-import os, queue, sys, threading, time, tkinter as tk
+import os, queue, re, sys, threading, time, tkinter as tk
 from dataclasses import dataclass, field
 
 sys.path.insert(0, "upstream")
@@ -41,6 +41,8 @@ class State:
     gate: dict = field(default_factory=dict)
     result: str = ""
     raw: str = ""
+    blind: bool = False
+    frames_seen: tuple = (0, 0)
     result_ok: bool = False
     demo: bool = False
     log: list = field(default_factory=list)
@@ -56,6 +58,48 @@ S = State()
 # does not announce itself is worse than no gate.
 S.demo = "--demo" in sys.argv
 Q = queue.Queue()
+
+
+
+class Frames:
+    """pNofM reassembly, with the paranoia qr.py documents.
+
+    Pins the total from the first frame, refuses an index out of range, and
+    refuses to overwrite a chunk it already holds with different bytes -- the
+    camera sees whatever is in front of it, including the tail of a previous
+    transfer.
+    """
+
+    def __init__(self):
+        self.total = None
+        self.chunks = {}
+
+    def reset(self):
+        self.total, self.chunks = None, {}
+
+    def feed(self, frame):
+        m = re.match(r"^p(\d+)of(\d+)\s*(.*)$", frame.strip(), re.S | re.I)
+        if not m:
+            return None
+        i, n, body = int(m.group(1)), int(m.group(2)), m.group(3)
+        if self.total is None:
+            self.total = n
+        elif n != self.total:
+            self.reset(); self.total = n
+        if not 1 <= i <= self.total:
+            return None
+        if i in self.chunks and self.chunks[i] != body:
+            self.reset(); self.total = n
+        self.chunks[i] = body
+        S.frames_seen = (len(self.chunks), self.total)
+        if len(self.chunks) != self.total:
+            return None
+        joined = "".join(self.chunks[k] for k in range(1, self.total + 1))
+        self.reset()
+        return "p1of1 " + joined
+
+
+FRAMES = Frames()
 
 
 # ------------------------------------------------------------ QR camera ----
@@ -80,7 +124,9 @@ def qr_thread():
             if pts is not None:
                 cv2.polylines(f, [pts.astype(int)], True, (60, 220, 150), 3)
             if txt:
-                Q.put(("qr", txt))
+                got = FRAMES.feed(txt)
+                if got is not None:
+                    Q.put(("qr", got))
         S.frame_qr = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
         time.sleep(0.01)
 
@@ -157,6 +203,12 @@ def device_key():
     return node.seckey
 
 
+def _addr(t, r, s_, y):
+    from addresses import eth_address
+    import secp256k1 as ec
+    return eth_address(ec.ecdsa_recover(t.sighash(), r, s_, y))
+
+
 def sign_tx(tx):
     import eth
     for cid, (nm, tk_) in {1: ("Ethereum", "ETH"), 8453: ("Base", "ETH"),
@@ -164,23 +216,40 @@ def sign_tx(tx):
                            11155111: ("Sepolia", "ETH")}.items():
         try: eth.register_chain(cid, nm, tk_)
         except Exception: pass
-    t = eth.EthTransaction(
+    common = dict(
         chain_id=tx["chain"], nonce=tx["nonce"],
         max_priority_fee_per_gas=int(tx["maxPrio"], 16),
         max_fee_per_gas=int(tx["maxFee"], 16),
         gas_limit=tx["gas"], to=tx["to"], value=int(tx["value"], 16))
+    if tx.get("blind") and tx.get("data") not in ("", "0x", None):
+        # A separate type on purpose: code meaning to sign a readable transfer
+        # must not silently accept a contract call instead.
+        import blindtx
+        t = blindtx.BlindContractCall(
+            data=bytes.fromhex(tx["data"].removeprefix("0x")), **common)
+        S.blind = True
+    else:
+        t = eth.EthTransaction(**common)
+        S.blind = False
     # The device renders with ops.EthereumSpend and signs with
     # eth.EthTransaction. They are separate on purpose -- one is what the owner
     # reads, the other is what the signature commits to -- and EthTransaction
     # has no render() at all, so hasattr() here quietly showed nothing.
     import ops
-    S.display = ops.EthereumSpend(
-        amount_wei=t.value, destination=t.to, chain_id=t.chain_id,
-        chain_name=t.chain_name(), nonce=t.nonce,
-        max_fee_wei=t.max_fee_wei()).render()
     sk = device_key()
-    r, s_, y = eth.sign(t, sk)
-    return t.txid(r, s_, y), t.encode_signed(r, s_, y).hex(), eth.sender(t, r, s_, y)
+    if S.blind:
+        # BlindContractCall renders itself -- there is no ops class for a call
+        # nobody can read, and inventing one would be the fiction this avoids.
+        import blindtx
+        S.display = t.render()
+        r, s_, y = blindtx.sign(t, sk)
+    else:
+        S.display = ops.EthereumSpend(
+            amount_wei=t.value, destination=t.to, chain_id=t.chain_id,
+            chain_name=t.chain_name(), nonce=t.nonce,
+            max_fee_wei=t.max_fee_wei()).render()
+        r, s_, y = eth.sign(t, sk)
+    return t.txid(r, s_, y), t.encode_signed(r, s_, y).hex(), _addr(t, r, s_, y)
 
 
 def worker(txt):
@@ -379,6 +448,8 @@ def tick():
         if ph is not None:
             widget.configure(image=ph); widget.image = ph
 
+    if S.stage == "SCANNING" and S.frames_seen[1] > 1:
+        txt_tx.config(text=f"collecting frames\n\n{S.frames_seen[0]} of {S.frames_seen[1]}")
     if S.tx:
         t = S.tx
         val = int(t["value"], 16) / 1e18
