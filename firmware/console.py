@@ -287,8 +287,57 @@ foot = tk.Frame(root, bg=BG); foot.pack(fill="x", padx=16, pady=(4, 10))
 txt_log = tk.Label(foot, text="", font=MONO_S, fg=DIM, bg=BG, justify="left",
                    anchor="w")
 txt_log.pack(side="left")
-tk.Label(foot, text="Q quit   R rescan   D demo gate", font=MONO_S, fg=DIM,
+tk.Label(foot, text="S signature   R rescan   D demo gate   Q quit", font=MONO_S, fg=DIM,
          bg=BG).pack(side="right")
+
+
+
+# --------------------------------------------------- carry-back overlay ----
+carry = tk.Frame(root, bg="#05070a")
+carry_qr = tk.Label(carry, bg="#05070a")
+carry_hex = tk.Label(carry, font=("DejaVu Sans Mono", 15), fg="#e6ebf2",
+                     bg="#05070a", justify="left")
+carry_note = tk.Label(carry, font=("DejaVu Sans", 12), fg="#7c8896", bg="#05070a")
+
+
+def chunked(h):
+    """Numbered 8-character blocks. Nobody can type 236 unbroken hex digits
+    and know where they are; with a block number they can stop and resume."""
+    h = h if h.startswith("0x") else "0x" + h
+    body = h[2:]
+    rows, per = [], 6
+    blocks = [body[i:i + 8] for i in range(0, len(body), 8)]
+    for r in range(0, len(blocks), per):
+        n = r + 1
+        rows.append(f"{n:>3}  " + " ".join(blocks[r:r + per]))
+    return "0x\n" + "\n".join(rows)
+
+
+def show_carry():
+    if not S.raw:
+        return
+    carry.place(relx=0, rely=0, relwidth=1, relheight=1)
+    carry_note.config(text="SIGNED TRANSACTION  —  scan with a phone, or type the blocks.  "
+                           "Esc to go back")
+    carry_note.pack(pady=(18, 10))
+    try:
+        import segno
+        q = segno.make("0x" + S.raw, error="L")
+        m = np.array(q.matrix, dtype="uint8")
+        m = np.kron(1 - m, np.ones((9, 9), "uint8")) * 255
+        m = np.pad(m, 36, constant_values=255)
+        ph = to_photo(np.dstack([m] * 3), 460, 460)
+        carry_qr.configure(image=ph); carry_qr.image = ph
+    except Exception:
+        pass
+    carry_qr.pack(side="left", padx=(40, 24))
+    carry_hex.config(text=chunked(S.raw))
+    carry_hex.pack(side="left", anchor="n", pady=8)
+    carry.lift()
+
+
+def hide_carry():
+    carry.place_forget()
 
 STAGE_COLOUR = {"SCANNING": ACC, "TRANSACTION": INK, "GATE": ACC,
                 "SIGNING": ACC, "SIGNED": OK, "REFUSED": BAD}
@@ -384,6 +433,8 @@ def tick():
 def on_key(e):
     k = e.keysym.lower()
     if k == "q": root.destroy()
+    elif k == "s": show_carry()
+    elif k == "escape": hide_carry()
     elif k == "r":
         S.stage = "SCANNING"; S.tx = {}; S.gate = {}; S.result = ""; S.raw = ""
         S.display = []; S.say("rescanning")
