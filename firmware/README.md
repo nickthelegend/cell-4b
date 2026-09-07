@@ -43,7 +43,7 @@ mistake that destroys a part:
 
 | Pin | Function | Resistor | Rail |
 |---|---|---|---|
-| GPIO2/3 | I²C1 — AS7341 0x39, OLED 0x3C | — | 3V3 |
+| GPIO2/3 | I²C1 — AS7341 0x39, MAX30100 0x57, OLED 0x3C | — | 3V3 |
 | GPIO12 | white LED #1 | **220 Ω** | **+5 V** |
 | GPIO16 | white LED #2 | **220 Ω** | **+5 V** |
 | GPIO23 | 940 nm IR | **220 Ω** | **+3V3** |

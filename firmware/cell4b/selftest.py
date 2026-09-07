@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import time
 
 from .hw import Bench, InterlockError
 from .spectro import FLOOR, FULL_SCALE, Spectrometer
@@ -178,6 +179,41 @@ def check_light_tight(n: int = 10) -> str:
 # hunting a wiring fault that was never there.
 NEEDS_OPTICS = {"emitters", "headroom", "lighttight"}
 
+
+def check_pulse():
+    """The touch tier's sensor, and whether a finger is on it.
+
+    Interactive because it cannot be otherwise: the measurement IS a finger.
+    Without one the honest answer is that the sensor is present and idle, not
+    that the gate failed.
+    """
+    try:
+        from cell4b.pulse import Max3010x, analyse, NoSensor, PERFUSION_MAX
+    except Exception as e:
+        return _line(FAIL, "pulse sensor", f"cannot import: {type(e).__name__}")
+    try:
+        dev = Max3010x()
+    except NoSensor as e:
+        return _line(FAIL, "pulse sensor", str(e))
+    except Exception as e:
+        return _line(FAIL, "pulse sensor", f"{type(e).__name__}: {e}")
+
+    print(f"      MAX3010x found, part id 0x{dev.part_id:02x}")
+    print("      put a finger on the ring and hold still -- 10 s")
+    dev.configure()
+    time.sleep(0.3)
+    _red, ir = dev.collect(10.0)
+    p = analyse(ir)
+    if p.present:
+        return _line(PASS, "pulse sensor",
+                     f"{p.bpm:.0f} bpm, confidence {p.confidence:.2f}, "
+                     f"perfusion {p.perfusion:.2f}%")
+    return _line(WARN, "pulse sensor",
+                 f"no pulse -- {p.reason or 'nothing detected'} "
+                 f"(bpm {p.bpm:.0f}, conf {p.confidence:.2f}, "
+                 f"perf {p.perfusion:.2f}%)")
+
+
 ORDER = [
     ("i2c", check_i2c, False),
     ("interlock", check_interlock, False),
@@ -185,6 +221,7 @@ ORDER = [
     ("emitters", check_emitters, False),
     ("headroom", check_headroom, False),
     ("lighttight", check_light_tight, True),
+    ("pulse", check_pulse, True),
 ]
 
 
