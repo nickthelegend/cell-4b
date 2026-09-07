@@ -25,48 +25,69 @@ from dataclasses import dataclass
 
 I2C_ADDR = 0x57
 
-# --- registers, MAX30102 datasheet table 1 ---------------------------------
-REG_INTR_STATUS_1  = 0x00
-REG_INTR_ENABLE_1  = 0x02
-REG_FIFO_WR_PTR    = 0x04
-REG_OVF_COUNTER    = 0x05
-REG_FIFO_RD_PTR    = 0x06
-REG_FIFO_DATA      = 0x07
-REG_FIFO_CONFIG    = 0x08
-REG_MODE_CONFIG    = 0x09
-REG_SPO2_CONFIG    = 0x0A
-REG_LED1_PA        = 0x0C          # red
-REG_LED2_PA        = 0x0D          # IR
-REG_PART_ID        = 0xFF
+# --- two chips, two register maps ------------------------------------------
+#
+# The MAX30100 and MAX30102 share an address and a family name and almost
+# nothing else. Writing 0x03 to "MODE_CONFIG" configures SpO2 mode on one and
+# writes to the FIFO read pointer on the other, and neither complains. So the
+# part id is read FIRST and the map is chosen from it.
+#
+#                      MAX30100      MAX30102
+#   part id            0x11          0x15
+#   FIFO data          0x05          0x07
+#   mode config        0x06          0x09
+#   samples            4 bytes       6 bytes
+#   resolution         16-bit        18-bit
+#   channel order      IR, RED       RED, IR
+#
+# The channel order is the one that fails silently: read a MAX30100 with the
+# 30102's order and you get a valid-looking pulse from the wrong LED.
 
-PART_MAX30102 = 0x15
-PART_MAX30105 = 0x15               # same id; the difference is a green LED
-PART_MAX30100 = 0x11
-
-# 100 Hz is the useful floor. A pulse tops out near 3.5 Hz, so 100 Hz is ~28x
-# oversampled -- plenty of margin for the filter and for dropped samples,
-# without producing more data than a 10 s window needs.
+# 100 Hz is the useful floor. A pulse tops out near 3.5 Hz, so this is ~28x
+# oversampled -- margin for the filter and for dropped samples, without
+# producing more data than a 10 s window needs.
 SAMPLE_RATE = 100
 
 # Perfusion index bounds, as AC/DC percent.
 #
 # The floor rejects things that are not modulating at all. The CEILING rejects
-# MOTION, and it is the one that took a test failure to find: rhythmic waving
-# over the sensor at 0.4 Hz put its second harmonic at 0.8 Hz, squarely inside
-# the pulse band, and the gate called it a 48 bpm heartbeat. Frequency alone
-# cannot tell a heartbeat from a hand, because a hand can move at heart rate.
+# MOTION, and it took a test failure to find: rhythmic waving at 0.4 Hz put its
+# second harmonic at 0.8 Hz, inside the pulse band, and the gate called it a
+# 48 bpm heartbeat. Frequency alone cannot tell a heartbeat from a hand,
+# because a hand can move at heart rate.
 #
-# Amplitude can. Blood volume changes modulate reflected light by a fraction of
-# a percent to a few percent. A finger physically moving on and off the ring
-# changes it by tens of percent -- it is a different SIZE of effect, not a
-# different frequency.
+# Amplitude can. Blood volume moves reflected light by a fraction of a percent
+# to a few percent; a finger physically moving on and off the ring moves it by
+# tens of percent. A different SIZE of effect, not a different frequency.
 #
-# 8.0 is a first cut from the literature's range for reflectance PPG and wants
-# checking against this sensor on real fingers. M-something should measure it
-# rather than inherit it from a comment.
+# 8.0 is a first cut from the literature for reflectance PPG and wants
+# measuring against this sensor on real fingers -- it is the one number here
+# that has never met a finger.
 PERFUSION_MIN = 0.05
 PERFUSION_MAX = 8.0
 
+
+PART_MAX30100 = 0x11
+PART_MAX30102 = 0x15               # MAX30105 shares this id; it adds green
+
+REG_PART_ID = 0xFF
+REG_REV_ID  = 0xFE
+
+MAP_30100 = dict(
+    int_status=0x00, int_enable=0x01, fifo_wr=0x02, ovf=0x03, fifo_rd=0x04,
+    fifo_data=0x05, mode=0x06, spo2=0x07, led=0x09,
+    sample_bytes=4, ir_first=True,
+)
+MAP_30102 = dict(
+    int_status=0x00, int_enable=0x02, fifo_wr=0x04, ovf=0x05, fifo_rd=0x06,
+    fifo_data=0x07, fifo_config=0x08, mode=0x09, spo2=0x0A,
+    led1=0x0C, led2=0x0D,
+    sample_bytes=6, ir_first=False,
+)
+
+# MAX30100 LED current steps, datasheet table 5. Not linear, so it is a table.
+LED_CURRENT_30100 = [0.0, 4.4, 7.6, 11.0, 14.2, 17.4, 20.8, 24.0,
+                     27.1, 30.6, 33.8, 37.0, 40.2, 43.6, 46.8, 50.0]
 
 @dataclass
 class Pulse:
@@ -89,6 +110,8 @@ class NoSensor(RuntimeError):
 
 
 class Max3010x:
+    """Either part. The map is chosen from the id, never assumed."""
+
     def __init__(self, i2c=None, address: int = I2C_ADDR):
         if i2c is None:
             import board, busio
@@ -97,60 +120,86 @@ class Max3010x:
         self.addr = address
         try:
             self.part_id = self._read(REG_PART_ID, 1)[0]
+            self.rev_id = self._read(REG_REV_ID, 1)[0]
         except Exception as e:
             raise NoSensor(
-                f"nothing answered at 0x{address:02x} -- check SDA/SCL and that "
-                f"the breakout has power ({type(e).__name__})") from None
-        if self.part_id not in (PART_MAX30102, PART_MAX30100):
+                f"nothing answered at 0x{address:02x} -- check VIN, GND, and "
+                f"that SDA/SCL reach pins 3 and 5 ({type(e).__name__})") from None
+        if self.part_id == PART_MAX30100:
+            self.m, self.name = MAP_30100, "MAX30100"
+        elif self.part_id == PART_MAX30102:
+            self.m, self.name = MAP_30102, "MAX30102/30105"
+        else:
             raise NoSensor(
                 f"0x{address:02x} answered with part id 0x{self.part_id:02x}, "
-                f"which is not a MAX3010x")
+                f"which is neither a MAX30100 (0x11) nor a MAX30102 (0x15)")
         self.reset()
 
     # ---- raw bus ----------------------------------------------------------
 
     def _write(self, reg: int, val: int) -> None:
-        self.i2c.writeto(self.addr, bytes([reg, val]))
+        while not self.i2c.try_lock():
+            pass
+        try:
+            self.i2c.writeto(self.addr, bytes([reg, val]))
+        finally:
+            self.i2c.unlock()
 
     def _read(self, reg: int, n: int) -> bytes:
         buf = bytearray(n)
-        self.i2c.writeto_then_readfrom(self.addr, bytes([reg]), buf)
+        while not self.i2c.try_lock():
+            pass
+        try:
+            self.i2c.writeto_then_readfrom(self.addr, bytes([reg]), buf)
+        finally:
+            self.i2c.unlock()
         return bytes(buf)
 
     # ---- configuration ----------------------------------------------------
 
     def reset(self) -> None:
-        self._write(REG_MODE_CONFIG, 0x40)
+        self._write(self.m["mode"], 0x40)
         time.sleep(0.05)
 
-    def configure(self, red_ma: float = 6.4, ir_ma: float = 6.4) -> None:
-        """SpO2 mode: red and IR, 100 Hz, 411 us pulses, 18-bit.
+    def configure(self, red_ma: float = 7.6, ir_ma: float = 7.6) -> None:
+        """SpO2 mode, ~100 Hz, both LEDs.
 
         Current is deliberately modest. A brighter LED does not give a better
-        pulse -- it saturates the photodiode against a fingertip and the AC
-        component, which IS the measurement, disappears into a flat ceiling.
+        pulse -- against a fingertip it saturates the photodiode and the AC
+        component, which IS the measurement, flattens into the ceiling.
         """
-        self._write(REG_INTR_ENABLE_1, 0xC0)       # FIFO almost full + new data
-        self._write(REG_FIFO_WR_PTR, 0x00)
-        self._write(REG_OVF_COUNTER, 0x00)
-        self._write(REG_FIFO_RD_PTR, 0x00)
-        # sample average 4, rollover on, almost-full at 17
-        self._write(REG_FIFO_CONFIG, 0b0100_1111)
-        self._write(REG_MODE_CONFIG, 0x03)         # red + IR
-        # ADC range 4096 nA, 100 Hz, 411 us -> 18-bit resolution
-        self._write(REG_SPO2_CONFIG, 0b0010_0111)
-        step = 0.2                                  # mA per LSB
-        self._write(REG_LED1_PA, min(255, int(red_ma / step)))
-        self._write(REG_LED2_PA, min(255, int(ir_ma / step)))
+        m = self.m
+        self._write(m["fifo_wr"], 0x00)
+        self._write(m["ovf"], 0x00)
+        self._write(m["fifo_rd"], 0x00)
+
+        if self.part_id == PART_MAX30100:
+            # SPO2_CONFIG: HI_RES_EN | SR=100Hz (001) | PW=1600us, 16-bit (11)
+            self._write(m["spo2"], 0b0100_0111)
+            def step(ma):
+                return min(range(16), key=lambda i: abs(LED_CURRENT_30100[i] - ma))
+            self._write(m["led"], (step(red_ma) << 4) | step(ir_ma))
+            self._write(m["mode"], 0x03)            # SpO2: red + IR
+        else:
+            self._write(m["fifo_config"], 0b0100_1111)
+            self._write(m["spo2"], 0b0010_0111)
+            self._write(m["led1"], min(255, int(red_ma / 0.2)))
+            self._write(m["led2"], min(255, int(ir_ma / 0.2)))
+            self._write(m["mode"], 0x03)
 
     # ---- sampling ---------------------------------------------------------
 
     def read_fifo(self) -> tuple[int, int]:
-        """One (red, ir) pair. Both are 18-bit, big-endian, top 6 bits unused."""
-        d = self._read(REG_FIFO_DATA, 6)
-        red = ((d[0] << 16) | (d[1] << 8) | d[2]) & 0x03FFFF
-        ir = ((d[3] << 16) | (d[4] << 8) | d[5]) & 0x03FFFF
-        return red, ir
+        """One (red, ir) pair, whichever way round the part reports them."""
+        m = self.m
+        d = self._read(m["fifo_data"], m["sample_bytes"])
+        if m["sample_bytes"] == 4:                  # MAX30100, 16-bit, IR first
+            a = (d[0] << 8) | d[1]
+            b = (d[2] << 8) | d[3]
+        else:                                       # MAX30102, 18-bit, RED first
+            a = ((d[0] << 16) | (d[1] << 8) | d[2]) & 0x03FFFF
+            b = ((d[3] << 16) | (d[4] << 8) | d[5]) & 0x03FFFF
+        return (b, a) if m["ir_first"] else (a, b)
 
     def collect(self, seconds: float = 10.0) -> tuple[list, list]:
         """Block for `seconds`, returning (red, ir) sample lists."""
