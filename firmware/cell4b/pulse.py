@@ -274,7 +274,15 @@ def analyse(samples, rate: int = SAMPLE_RATE) -> Pulse:
 
     # Concentration: the peak and its immediate neighbours, over the whole
     # band. A single sharp line scores high; broadband noise scores low.
-    lo, hi = max(0, k - 2), min(spec.size, k + 3)
+    #
+    # Both ends are clamped INTO the band, and that matters more than it looks.
+    # A peak sitting on the band edge -- 42 bpm is exactly 0.7 Hz -- had its
+    # neighbourhood reach outside, so the numerator included energy the
+    # denominator did not and confidence came back as 1.05. A ratio above 1 is
+    # not a very good score, it is a broken one, and it was flattering the
+    # readings closest to the boundary.
+    idx = np.flatnonzero(band)
+    lo, hi = max(idx[0], k - 2), min(idx[-1] + 1, k + 3)
     confidence = float(spec[lo:hi].sum() / spec[band].sum())
 
     reason = ""
