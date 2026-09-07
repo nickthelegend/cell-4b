@@ -1,0 +1,125 @@
+<!doctype html><meta charset="utf-8"><title>provider end to end</title>
+<style>body{font:13px/1.7 ui-monospace,Menlo,monospace;background:#0f1318;color:#e6ebf2;padding:22px}
+.ok{color:#5fd39a}.bad{color:#f08a7a}.d{color:#7c8896}pre{white-space:pre-wrap}</style>
+<h3 style="font:600 15px ui-sans-serif,system-ui;margin:0 0 4px">provider end to end</h3>
+<div class="d" style="font-size:12px;margin-bottom:14px">
+  Loads the real inpage.js as a standalone wallet. No window.ethereum, no MetaMask.</div>
+<pre id="o">running&hellip;</pre>
+<script>
+// Stand-in for content.js + background.js: same postMessage protocol, and it
+// does what the service worker does -- relay to the device, proxy to a node.
+const CFG = { address: "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
+              chainId: "0xaa36a7", rpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
+              deviceUrl: "http://127.0.0.1:8799" };
+const SENT = []; window.__SENT = SENT;
+window.addEventListener("message", async (ev) => {
+  if (ev.source !== window || ev.data?.channel !== "cell-bridge") return;
+  const { id, payload } = ev.data;
+  let reply;
+  try {
+    if (payload.type === "cell:config") reply = { ok: true, config: CFG };
+    else if (payload.type === "cell:probe")
+      reply = { ok: true, info: await (await fetch(CFG.deviceUrl + "/")).json() };
+    else if (payload.type === "cell:sign")
+      reply = { ok: true, result: await (await fetch(CFG.deviceUrl + "/", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ request: payload.request }) })).json() };
+    else if (payload.type === "cell:rpc") {
+      if (payload.method === "eth_sendRawTransaction") {
+        SENT.push(payload.params[0]);           // captured, not broadcast
+        reply = { ok: true, result: "0xWOULD_BROADCAST" };
+      } else {
+        const r = await fetch(CFG.rpcUrl, { method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: payload.method,
+                                 params: payload.params || [] }) });
+        const j = await r.json();
+        reply = j.error ? { ok: false, error: j.error.message, code: j.error.code }
+                        : { ok: true, result: j.result };
+      }
+    } else reply = { ok: false, error: "unknown " + payload.type };
+  } catch (e) { reply = { ok: false, error: String(e.message || e) }; }
+  window.postMessage({ channel: "cell-bridge-reply", id, reply }, "*");
+});
+</script>
+<script type="module" src="./extension/inpage.js"></script>
+<script type="module">
+const o = document.getElementById("o"); o.textContent = "";
+const say = (m, c) => o.innerHTML += `<span class="${c || 'd'}">${m}</span>\n`;
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+const T = (name, pass, detail = "") =>
+  say(`${pass ? "PASS" : "FAIL"}  ${name.padEnd(34)} ${detail}`, pass ? "ok" : "bad");
+await wait(500);
+
+// ---- 1. EIP-6963 discovery, with no window.ethereum anywhere -------------
+let found = null;
+window.addEventListener("eip6963:announceProvider", (e) => {
+  if (/cell/i.test(e.detail.info.rdns)) found = e.detail;
+});
+window.dispatchEvent(new Event("eip6963:requestProvider"));
+await wait(300);
+T("announced over EIP-6963", !!found, found ? found.info.rdns : "");
+T("took the free window.ethereum slot", window.ethereum?.isCELL === true);
+const p = found?.provider || window.ethereum;
+
+// ---- 2. accounts and chain come from config, not a wallet ---------------
+const accs = await p.request({ method: "eth_requestAccounts" });
+T("eth_accounts is the device address", accs[0] === CFG.address, accs[0]);
+const cid = await p.request({ method: "eth_chainId" });
+T("eth_chainId is Sepolia", cid === "0xaa36a7", cid);
+
+// ---- 3. unknown methods proxy to a real node ----------------------------
+const bal = await p.request({ method: "eth_getBalance", params: [accs[0], "latest"] });
+T("proxies reads to the node", /^0x/.test(bal), (Number(BigInt(bal)) / 1e18).toFixed(6) + " ETH");
+
+// ---- 4. the refusals are refusals ---------------------------------------
+for (const [name, args, code] of [
+  ["calldata refused", { method: "eth_sendTransaction", params: [{ from: accs[0],
+     to: CFG.address, value: "0x0", data: "0xa9059cbb" }] }, 4100],
+  ["chain switch refused", { method: "wallet_switchEthereumChain",
+     params: [{ chainId: "0x1" }] }, 4902],
+  ["personal_sign refused", { method: "personal_sign", params: ["0x00", accs[0]] }, 4200],
+]) {
+  let err = null;
+  try { await p.request(args); } catch (e) { err = e; }
+  T(name, err?.code === code, err ? `code ${err.code}` : "NOT REFUSED");
+  T(`  ${name} opened no overlay`, !document.querySelector(".cellbr-root"));
+}
+
+// ---- 5. the whole send -------------------------------------------------
+const pending = p.request({ method: "eth_sendTransaction",
+  params: [{ from: accs[0], to: "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+             value: "0x38d7ea4c68000" }] });     // 0.001 ETH, lowercase on purpose
+await wait(1200);
+const ov = document.querySelector(".cellbr-root");
+T("overlay opened", !!ov);
+T("overlay is styled", ov && getComputedStyle(ov).position === "fixed");
+const qr = ov?.querySelector(".cellbr-qr path")?.getAttribute("d")?.length ?? 0;
+T("QR rendered", qr > 500, qr + " path chars");
+const lines = ov?.querySelector(".cellbr-lines")?.textContent ?? "";
+T("address re-checksummed", lines.replace(/\s+/g, "")
+   .includes("0x742d35Cc6634C0532925a3b844Bc454e4438f44e"));
+T("camera button present", !!ov?.querySelector('[data-act="scan"]'));
+ov?.querySelector('[data-act="mock"]')?.click();
+
+let after = "", fromDev = false;
+for (let i = 0; i < 80 && !fromDev; i++) {
+  after = document.querySelector(".cellbr-lines")?.textContent ?? after;
+  fromDev = /SEPOLIA/i.test(after);
+  if (!fromDev) await wait(50);
+}
+T("device's own render replaces preview", fromDev, after.split("\n")[0]);
+
+let hash = null, err = null;
+try { hash = await Promise.race([pending, wait(12000).then(() => { throw new Error("timeout"); })]); }
+catch (e) { err = e.message; }
+T("send resolved", hash === "0xWOULD_BROADCAST", hash ?? err);
+const raw = window.__SENT[0];
+T("raw transaction produced", !!raw, raw ? raw.slice(0, 44) + "…" : "none");
+T("is a typed EIP-1559 tx", raw?.startsWith("0x02"), raw?.slice(0, 4));
+T("overlay closed after send", !document.querySelector(".cellbr-root"));
+
+say("\n" + [...o.querySelectorAll(".ok")].length + " passed, "
+    + [...o.querySelectorAll(".bad")].length + " failed",
+    [...o.querySelectorAll(".bad")].length ? "bad" : "ok");
+</script>
