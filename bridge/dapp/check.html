@@ -1,0 +1,55 @@
+<!doctype html><meta charset="utf-8"><title>CELL extension check</title>
+<style>body{font:14px/1.7 ui-monospace,Menlo,monospace;background:#0B0D10;color:#E6EBF2;padding:26px}
+h1{font:600 18px ui-sans-serif,system-ui;margin:0 0 14px}
+.ok{color:#5FD39A}.bad{color:#F08A7A}.d{color:#7C8896}pre{white-space:pre-wrap}</style>
+<h1>CELL extension check</h1>
+<div class="d" style="margin-bottom:14px">Finds which module fails to load. Nothing to click.</div>
+<pre id="o">running&hellip;</pre>
+<script>
+const errs = [];
+addEventListener("error", e => errs.push({
+  where: e.filename ? e.filename.split("/").pop() : "?",
+  line: e.lineno, msg: (e.message || "").slice(0, 160)}), true);
+addEventListener("unhandledrejection", e =>
+  errs.push({where: "promise", msg: String(e.reason).slice(0, 160)}));
+
+const seen = [];
+addEventListener("eip6963:announceProvider", e => seen.push(e.detail));
+dispatchEvent(new Event("eip6963:requestProvider"));
+
+setTimeout(async () => {
+  // List EVERY extension script on the page. The first match was a different
+  // extension that also injects a file called inpage.js -- ours puts it at the
+  // extension ROOT, so a src with any path segment before it is somebody else.
+  const all = [...document.querySelectorAll('script[src^="chrome-extension"]')]
+                .map(s => s.src);
+  const ours = all.find(u => /^chrome-extension:\/\/[a-z]+\/inpage\.js/.test(u));
+  const tag = ours ? { src: ours } : null;
+  const base = ours ? ours.replace(/inpage\.js.*$/, "") : null;
+  const R = {
+    allExtensionScripts: all,
+    ourScript: ours || null,
+    base,
+    announced: seen.map(d => d.info.rdns),
+    windowEthereum: typeof window.ethereum,
+    errors: errs,
+    modules: {},
+  };
+  // Import each module on its own, so one failure names itself instead of
+  // taking the whole graph down silently.
+  if (base) {
+    for (const m of ["lib/qr.js", "lib/wire.js", "lib/keccak.js", "inpage.js"]) {
+      try { await import(base + m); R.modules[m] = "ok"; }
+      catch (e) { R.modules[m] = String(e.message || e).slice(0, 170); }
+    }
+    try {
+      const r = await fetch(base + "lib/keccak.js");
+      R.keccakFetch = r.status + " " + r.headers.get("content-type");
+    } catch (e) { R.keccakFetch = "FETCH FAILED: " + e.message; }
+  }
+  const pass = R.announced.length > 0;
+  o.innerHTML = `<span class="${pass ? "ok" : "bad"}">${pass ? "WORKING" : "NOT WORKING"}</span>\n\n`
+              + JSON.stringify(R, null, 1);
+  new Image().src = "/report?r=" + encodeURIComponent(JSON.stringify(R)) + "&t=" + Date.now();
+}, 1800);
+</script>

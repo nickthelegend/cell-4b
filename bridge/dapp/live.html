@@ -1,0 +1,71 @@
+<!doctype html><meta charset="utf-8"><title>CELL live test</title>
+<style>body{font:13px/1.7 ui-monospace,Menlo,monospace;background:#0B0D10;color:#E6EBF2;padding:24px}
+h1{font:600 17px ui-sans-serif,system-ui;margin:0 0 12px}
+.ok{color:#5FD39A}.bad{color:#F08A7A}.d{color:#7C8896}pre{white-space:pre-wrap}</style>
+<h1>CELL live test &mdash; real extension, real Chrome</h1>
+<pre id="o">running&hellip;</pre>
+<script>
+const R = [], o = document.getElementById("o");
+const T = (n, p, d = "") => { R.push([n, p, d]);
+  o.innerHTML += `<span class="${p ? "ok" : "bad"}">${p ? "PASS" : "FAIL"}</span>  ${n.padEnd(32)} <span class="d">${d}</span>\n`; };
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const seen = [];
+addEventListener("eip6963:announceProvider", e => seen.push(e.detail));
+dispatchEvent(new Event("eip6963:requestProvider"));
+
+(async () => {
+  o.textContent = "";
+  await wait(700);
+  const cell = seen.find(d => /cell/i.test(d.info.rdns));
+  T("announced over EIP-6963", !!cell, cell?.info.rdns || "");
+  const p = cell?.provider;
+  if (!p) { report(); return; }
+
+  let acc = null;
+  try { acc = (await p.request({ method: "eth_accounts" }))[0];
+        T("eth_accounts", !!acc, acc); }
+  catch (e) { T("eth_accounts", false, e.message.slice(0, 70)); }
+
+  let cid = null;
+  try { cid = await p.request({ method: "eth_chainId" });
+        T("eth_chainId is Sepolia", cid === "0xaa36a7", cid); }
+  catch (e) { T("eth_chainId", false, e.message.slice(0, 60)); }
+
+  for (const [n, args, code] of [
+    ["calldata refused", { method: "eth_sendTransaction", params: [{ to: "0x742d35Cc6634C0532925a3b844Bc454e4438f44e", value: "0x0", data: "0xdeadbeef" }] }, 4100],
+    ["chain switch refused", { method: "wallet_switchEthereumChain", params: [{ chainId: "0x1" }] }, 4902],
+    ["personal_sign refused", { method: "personal_sign", params: ["0x00"] }, 4200]]) {
+    let err = null;
+    try { await p.request(args); } catch (e) { err = e; }
+    T(n, err?.code === code, err ? "code " + err.code : "NOT REFUSED");
+  }
+
+  if (acc && cid === "0xaa36a7") {
+    try {
+      const bal = await p.request({ method: "eth_getBalance", params: [acc, "latest"] });
+      T("proxies reads to a node", /^0x/.test(bal), (Number(BigInt(bal)) / 1e18).toFixed(6) + " ETH");
+    } catch (e) { T("proxies reads to a node", false, e.message.slice(0, 60)); }
+
+    const pending = p.request({ method: "eth_sendTransaction", params: [{
+      to: "0x742d35cc6634c0532925a3b844bc454e4438f44e", value: "0x38d7ea4c68000" }] });
+    await wait(1500);
+    const ov = document.querySelector(".cellbr-root");
+    T("overlay opened", !!ov);
+    T("QR rendered", (ov?.querySelector(".cellbr-qr path")?.getAttribute("d")?.length ?? 0) > 500);
+    ov?.querySelector('[data-act="mock"]')?.click();
+    let hash = null, err = null;
+    try { hash = await Promise.race([pending, wait(15000).then(() => { throw new Error("timeout"); })]); }
+    catch (e) { err = e.message; }
+    T("broadcast", !!hash && /^0x[0-9a-f]{64}$/i.test(hash), hash || err);
+  } else {
+    T("send skipped", false, "configure the popup: address + Sepolia");
+  }
+  report();
+})();
+function report() {
+  const pass = R.filter(r => r[1]).length;
+  o.innerHTML += `\n<span class="${pass === R.length ? "ok" : "bad"}">${pass}/${R.length} passed</span>`;
+  new Image().src = "/report?r=" + encodeURIComponent(JSON.stringify(
+    { live: R.map(([n, p, d]) => `${p ? "PASS" : "FAIL"} ${n} ${d}`) })) + "&t=" + Date.now();
+}
+</script>
