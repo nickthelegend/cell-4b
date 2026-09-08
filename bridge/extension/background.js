@@ -21,6 +21,12 @@ const DEFAULTS = {
   // Off unless the owner turns it on, per session of their own choosing. A
   // device that blind-signs by default is a device that does not render.
   blind: false,
+  // Which gate the OPERATOR intends to clear: "pulse" or "blood". This is
+  // declared, not commanded. The browser cannot tell the device to accept a
+  // weaker proof -- the device enforces whichever gate is actually invoked on
+  // it. Carrying it here only lets the overlay say what is about to be asked
+  // of you, so a page cannot quietly expect blood while you offer a finger.
+  gate: "pulse",
 };
 
 async function cfg() {

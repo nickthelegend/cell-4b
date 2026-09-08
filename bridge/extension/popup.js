@@ -1,4 +1,4 @@
-const F = ["address", "chainId", "rpcUrl", "deviceUrl"];
+const F = ["address", "chainId", "rpcUrl", "deviceUrl", "gate"];
 const BOOLS = ["blind"];
 const msg = (t, ok = true) => {
   const m = document.getElementById("msg");

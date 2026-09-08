@@ -34,6 +34,16 @@
 <label>Device (mock only)</label>
 <input id="deviceUrl" spellcheck="false">
 
+<label>Gate to clear</label>
+<select id="gate">
+  <option value="pulse">Pulse &mdash; a finger on the touch tier</option>
+  <option value="blood">Blood &mdash; a cartridge through G1&ndash;G6</option>
+</select>
+<div style="font-size:10px;color:#7c8896;margin-top:5px;line-height:1.45">
+  Declared, not commanded. The device enforces the gate you actually invoke on
+  it; this only makes the overlay say which one to expect.
+</div>
+
 <label style="margin-top:14px">Contract calls</label>
 <div style="display:flex;align-items:flex-start;gap:8px">
   <input type="checkbox" id="blind" style="width:auto;margin-top:2px">

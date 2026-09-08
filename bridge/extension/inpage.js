@@ -243,10 +243,14 @@ async function sendTransaction(tx = {}) {
   const digest = await wire.digest(req);
   const frames = wire.encode(req);
   const eth = Number(BigInt(req.value)) / 1e18;
+  const gate = CONFIG.gate === "blood"
+    ? "BLOOD  -- cartridge, G1-G6"
+    : "PULSE  -- finger on the touch tier";
   const lines = hasData ? [
     `!! UNREAD CONTRACT CALL !!`,
     `  the device cannot explain this`,
     ``,
+    `  gate     ${gate}`,
     `  to       ${req.to.slice(0, 26)}`,
     `           ${req.to.slice(26)}`,
     `  value    ${eth} ETH`,
@@ -255,6 +259,7 @@ async function sendTransaction(tx = {}) {
     `  nonce    ${req.nonce}`,
   ] : [
     `SEND ON CHAIN ${req.chain}`,
+    `  gate     ${gate}`,
     `  amount   ${eth} ETH`,
     `  to`,
     `           ${req.to.slice(0, 26)}`,
