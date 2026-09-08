@@ -12,7 +12,7 @@ constant, and a ratio divides it out.
 """
 from __future__ import annotations
 
-import base64, sys, threading, time, tkinter as tk
+import base64, glob, os, sys, threading, time, tkinter as tk
 sys.path.insert(0, "upstream")
 
 import cv2
@@ -31,7 +31,7 @@ TH = bg.Thresholds()
 # stream: opening it twice fails, and a preview that fought the analysis for
 # the sensor would change the exposure the correlation depends on.
 CAM = {"frame": None, "burst": [], "err": None}
-QR = {"frame": None}
+QR = {"frame": None, "t": 0.0, "err": None, "dev": None}
 
 # Preview lamp. With every emitter off there is genuinely nothing to
 # see -- correct for the instrument, useless for a console someone is
@@ -267,16 +267,68 @@ def pulse_thread():
         PULSE["err"] = f"{type(e).__name__}: {e}"
 
 
+def uvc_indices():
+    """Video nodes backed by uvcvideo, lowest first.
+
+    A USB camera does not keep its index. This one was video1, dropped off the
+    bus, and came back as video2 -- so a hardcoded index, or a guess from a
+    short list, breaks on every replug. The kernel already knows which nodes
+    are UVC; ask it rather than probing and hoping.
+    """
+    found = []
+    for d in sorted(glob.glob("/sys/class/video4linux/video*")):
+        try:
+            drv = os.path.basename(os.path.realpath(os.path.join(d, "device/driver")))
+        except OSError:
+            continue
+        if drv == "uvcvideo":
+            found.append(int(os.path.basename(d)[5:]))
+    return found or [1, 2, 0]
+
+
 def qr_camera_thread():
-    cap = cv2.VideoCapture(1, cv2.CAP_V4L2)
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    """Keep a live frame, or none at all -- never a stale one.
+
+    This used to hold the last good frame forever. When the camera dropped off
+    the USB bus mid-session the pane went on showing a picture of the room, so
+    it looked live while the scanner re-read one dead image indefinitely. A
+    stale frame is worse than a black one: it reads as working. Now a stalled
+    capture is dropped, the device is reopened, and the pane goes empty so the
+    fault is visible.
+    """
+    cap, fails = None, 0
     while True:
+        if cap is None:
+            for idx in uvc_indices():
+                c = cv2.VideoCapture(idx, cv2.CAP_V4L2)
+                if c.isOpened():
+                    ok, _ = c.read()
+                    if ok:
+                        cap, QR["dev"] = c, idx
+                        break
+                c.release()
+            if cap is None:
+                QR["frame"], QR["err"] = None, "no USB camera"
+                time.sleep(1.0)
+                continue
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)   # newest frame, not a queue
+            fails, QR["err"] = 0, None
+
         ok, f = cap.read()
-        if ok:
-            QR["frame"] = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
-        time.sleep(0.05)
+        if ok and f is not None:
+            QR["frame"], QR["t"], fails = cv2.cvtColor(f, cv2.COLOR_BGR2RGB), time.time(), 0
+        else:
+            fails += 1
+            if fails > 15:
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+                cap, QR["frame"], QR["err"] = None, None, "camera stalled - reopening"
+        time.sleep(0.03)
 ADVANCE = threading.Event()
 
 S = {"stage": "idle", "dark": None, "white": None, "chem": None,
@@ -326,7 +378,40 @@ def chemistry(spec, bench):
     S["stage"] = "chem done"
 
 
-SCAN = {"qr": None, "parts": {}, "want": 0}
+FRAME_FILE = "/tmp/cell-frame.txt"
+SCAN = {"qr": None, "parts": {}, "want": 0, "shown": False}
+
+
+def decode_qr(det, frame):
+    """Try harder than one detectAndDecode on one raw frame.
+
+    A screen filmed by a webcam is low contrast, a little out of focus, and
+    often moire-patterned; cv2's detector quietly gives up on all three. The
+    plain grayscale, an upscaled copy and an adaptively thresholded one cost
+    a few milliseconds between them and turn "it will not scan" into "it
+    scans". Also reports whether a code was SEEN but not read, which is the
+    difference between aim at it and hold it still.
+
+    Returns (text, saw_a_code).
+    """
+    g = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+    seen = False
+    tries = (g,
+             cv2.resize(g, None, fx=1.6, fy=1.6, interpolation=cv2.INTER_CUBIC),
+             cv2.adaptiveThreshold(g, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
+                                   cv2.THRESH_BINARY, 31, 5))
+    for img in tries:
+        try:
+            ok, texts, pts, _ = det.detectAndDecodeMulti(img)
+        except Exception:
+            continue
+        if pts is not None and len(pts):
+            seen = True
+        if ok:
+            for t in texts:
+                if t:
+                    return t, True
+    return "", seen
 
 
 def scan_and_sign(spec, bench):
@@ -349,19 +434,39 @@ def scan_and_sign(spec, bench):
     from cell4b import pulse as P
 
     SIGN.update(stage="SCAN", txid="", ok=None,
-                lines=["hold the QR up to the USB camera"])
-    SCAN.update(qr=None, parts={}, want=0)
+                lines=["hold the QR up to the USB camera",
+                       "(or drop a frame at /tmp/cell-frame.txt)"])
+    SCAN.update(qr=None, parts={}, want=0, shown=False)
 
     det = cv2.QRCodeDetector()
     t0 = time.time()
     while time.time() - t0 < 120:
-        f = QR["frame"]
-        if f is None:
-            time.sleep(0.1); continue
-        try:
-            txt, _, _ = det.detectAndDecode(cv2.cvtColor(f, cv2.COLOR_RGB2GRAY))
-        except Exception:
-            txt = ""
+        txt = ""
+        # A frame handed over on disk, for when the camera cannot see the
+        # screen. The transport changes; nothing else does. It is the same
+        # payload, rebuilt from the same fields, shown the same way, behind
+        # the same gate -- the device still verifies what it is about to sign.
+        if os.path.exists(FRAME_FILE):
+            try:
+                txt = open(FRAME_FILE).read().strip()
+                os.remove(FRAME_FILE)
+                SIGN.update(lines=["frame handed over directly"])
+            except OSError:
+                txt = ""
+        else:
+            f = QR["frame"]
+            if f is None or time.time() - QR["t"] > 2.0:
+                # No camera, or a frame old enough that it cannot be what is
+                # being held up now. Scanning a stale frame is how a dead
+                # camera looks like a bad QR.
+                SIGN.update(lines=[QR["err"] or "waiting for the QR camera"])
+                time.sleep(0.2); continue
+            txt, seen = decode_qr(det, f)
+            if not txt:
+                SIGN.update(lines=[
+                    "QR IN FRAME -- hold it still" if seen
+                    else "no QR in frame -- fill more of the camera with it",
+                    f"{120 - int(time.time() - t0)} s left"])
         if txt:
             m = re.match(r"^p(\d+)of(\d+)\s*(.*)$", txt.strip(), re.S)
             if m:
@@ -431,12 +536,124 @@ def scan_and_sign(spec, bench):
     r, s_, y = signer(t, device_key())
     raw = "0x" + t.encode_signed(r, s_, y).hex()
     SCAN["qr"] = segno.make(raw, error="l")
+    # Also written out, because a signature that exists only as pixels on a
+    # screen nobody can scan is a signature that does not exist. The QR is
+    # still the airgap; this is the fallback that stops a working device
+    # looking like a broken one.
+    try:
+        with open("/tmp/cell-signed.txt", "w") as fh:
+            fh.write(raw + "\n")
+    except OSError:
+        pass
     txid = t.txid(r, s_, y)
     SIGN.update(stage="SIGNED", ok=True, txid=txid, lines=shown + [
         "", f"bpm {q.bpm:.0f}  conf {q.confidence:.2f}  "
             f"perfusion {q.perfusion:.2f}",
         "PULSE PRESENT -- signed", "", f"txid {txid}",
         "scan the QR back into the browser"])
+
+
+def sign_with_blood(spec, bench, seconds=300):
+    """A signature no finger can authorise. G1-G6, then the key.
+
+    The pulse path proves a person is present. This proves a person BLED --
+    which is a different and much stronger claim, and it is the one the whole
+    instrument exists to make. Nothing here may be skipped: every gate must
+    return passed, and a single failure signs nothing at all.
+
+    The order is forced by the physics, not by convenience. Chemistry first,
+    because it is fast and cheap and rules out dye. Speckle second, because
+    G5 and G6 are a PAIR -- liquid now, arrested later -- and the sample has
+    to be given time to clot between them. That is also why this cannot be
+    faked by holding something still: G5 has already required it to flow.
+    """
+    import base64, json, re
+    sys.path.insert(0, "upstream")
+    import blindtx, eth, ops, segno
+    from devkey import device_key
+
+    if not os.path.exists(FRAME_FILE):
+        SIGN.update(stage="NO FRAME", ok=False,
+                    lines=["nothing armed to sign",
+                           "load a transaction first"])
+        return
+
+    def refuse(why, gates=()):
+        SIGN.update(stage="REFUSED", ok=False, lines=(
+            [why, ""] + [f"  {'PASS' if g.passed else 'FAIL'}  {g.name}"
+                         for g in gates] + ["", "NOTHING WAS SIGNED"]))
+
+    # --- chemistry -------------------------------------------------------
+    S["stage"] = "dark"; S["msg"] = "reading dark"
+    S["dark"] = read3(spec, bench, "dark")
+    S["stage"] = "white"; S["msg"] = "reading the white patch"
+    S["white"] = read3(spec, bench, "white")
+    ADVANCE.clear()
+    S["stage"] = "advance"
+    S["msg"] = "push the cartridge to the SECOND stop, then press SPACE"
+    SIGN.update(stage="BLOOD", ok=None,
+                lines=["advance the cartridge to the well", "then press SPACE"])
+    if not ADVANCE.wait(180):
+        S["stage"] = "idle"
+        return refuse("timed out waiting for the cartridge")
+    S["stage"] = "sample"; S["msg"] = "reading the sample"
+    S["chem"] = read3(spec, bench, "white")
+    cap = {"dark": S["dark"], "white": S["white"], "chem": S["chem"]}
+    try:
+        chem = bg.chemistry_gates(cap, TH)
+    except Exception as e:
+        S["stage"] = "idle"
+        return refuse(f"chemistry read failed: {type(e).__name__}: {e}")
+    S["gates"] = chem
+    if not all(g.passed for g in chem):
+        S["stage"] = "chem done"
+        S["msg"] = "chemistry refused -- nothing signed"
+        return refuse("CHEMISTRY REFUSED THIS SAMPLE", chem)
+
+    # --- speckle: flowing now, arrested later -----------------------------
+    SIGN.update(stage="BLOOD", lines=["chemistry passed",
+                                      f"watching it clot -- {seconds}s"])
+    speckle(spec, bench, seconds)
+    motion = [g for g in S["gates"] if g.name.startswith(("G5", "G6"))]
+    if len(motion) < 2 or not all(g.passed for g in motion):
+        return refuse("MOTION GATES REFUSED THIS SAMPLE", S["gates"])
+
+    # --- every gate passed. only now is there a key ----------------------
+    txt = open(FRAME_FILE).read().strip()
+    os.remove(FRAME_FILE)
+    tx = json.loads(base64.b64decode(re.sub(r"^p\d+of\d+\s*", "", txt)))
+    data = bytes.fromhex((tx.get("data") or "").removeprefix("0x"))
+    if data:
+        t = blindtx.BlindContractCall(
+            chain_id=tx["chain"], nonce=tx["nonce"],
+            max_priority_fee_per_gas=int(tx["maxPrio"], 16),
+            max_fee_per_gas=int(tx["maxFee"], 16), gas_limit=tx["gas"],
+            to=tx["to"], value=int(tx["value"], 16), data=data)
+        shown, signer = t.render(), blindtx.sign
+    else:
+        t = eth.EthTransaction(
+            chain_id=tx["chain"], nonce=tx["nonce"],
+            max_priority_fee_per_gas=int(tx["maxPrio"], 16),
+            max_fee_per_gas=int(tx["maxFee"], 16), gas_limit=tx["gas"],
+            to=tx["to"], value=int(tx["value"], 16))
+        shown = ops.EthereumSpend(
+            amount_wei=t.value, destination=t.to, chain_id=t.chain_id,
+            chain_name=t.chain_name(), nonce=t.nonce,
+            max_fee_wei=t.max_fee_wei()).render()
+        signer = eth.sign
+
+    r, s_, y = signer(t, device_key())
+    raw = "0x" + t.encode_signed(r, s_, y).hex()
+    SCAN["qr"] = segno.make(raw, error="l")
+    SCAN["shown"] = False
+    try:
+        with open("/tmp/cell-signed.txt", "w") as fh:
+            fh.write(raw + "\n")
+    except OSError:
+        pass
+    SIGN.update(stage="SIGNED BY BLOOD", ok=True, txid=t.txid(r, s_, y),
+                lines=shown + ["", "ALL SIX GATES PASSED",
+                               f"txid {t.txid(r, s_, y)}"])
 
 
 def speckle(spec, bench, seconds=600):
@@ -469,105 +686,120 @@ def speckle(spec, bench, seconds=600):
 
 
 # ------------------------------------------------------------------- UI ----
+# Laid out for the screen this actually runs on: 1520 x 651. Wide and SHORT.
+# The first version stacked panels vertically and needed ~1000 px, so the
+# signing status, the plot and the key legend all rendered below the bottom
+# edge -- X worked from the day it was written and simply had nowhere to say
+# so. Three horizontal bands now, none of them taller than they need to be.
 root = tk.Tk(); root.title("BLOOD GATE"); root.configure(bg=BG)
 root.attributes("-fullscreen", True)
 
-hdr = tk.Frame(root, bg=BG); hdr.pack(fill="x", padx=18, pady=(12, 4))
-tk.Label(hdr, text="BLOOD GATE", font=BIG, fg=ACC, bg=BG).pack(side="left")
-l_stage = tk.Label(hdr, text="idle", font=MB, fg=WARN, bg=BG); l_stage.pack(side="left", padx=16)
-l_msg = tk.Label(hdr, text="", font=M, fg=DIM, bg=BG); l_msg.pack(side="right")
+SMALL = ("DejaVu Sans Mono", 10)
+HEAD = ("DejaVu Sans Mono", 10)
 
-l_spk = tk.Label(root, text="", font=M, fg=WARN, bg=BG, anchor="w")
-l_spk.pack(fill="x", padx=18)
-l_raw = tk.Label(root, text="", font=M, fg=INK, bg=BG, anchor="w", justify="left")
-l_raw.pack(fill="x", padx=18, pady=(2, 8))
+hdr = tk.Frame(root, bg=BG); hdr.pack(fill="x", padx=12, pady=(6, 2))
+tk.Label(hdr, text="BLOOD GATE", font=("DejaVu Sans Mono", 17, "bold"),
+         fg=ACC, bg=BG).pack(side="left")
+l_stage = tk.Label(hdr, text="idle", font=MB, fg=WARN, bg=BG)
+l_stage.pack(side="left", padx=12)
+l_msg = tk.Label(hdr, text="", font=SMALL, fg=DIM, bg=BG)
+l_msg.pack(side="right")
 
-# body takes only what it needs; the plot below gets every remaining
-# pixel. Packed with expand=True it was losing the argument to four
-# other panels and ending up ~100 px tall.
-body = tk.Frame(root, bg=BG); body.pack(fill="x", padx=18)
-cams = tk.Frame(body, bg=BG); cams.pack(side="left", fill="both")
-right = tk.Frame(body, bg=BG); right.pack(side="left", fill="both",
-                                          expand=True, padx=(16, 0))
+l_spk = tk.Label(root, text="", font=SMALL, fg=WARN, bg=BG, anchor="w")
+l_spk.pack(fill="x", padx=12)
+l_raw = tk.Label(root, text="", font=SMALL, fg=INK, bg=BG, anchor="w",
+                 justify="left")
+l_raw.pack(fill="x", padx=12, pady=(0, 4))
+
+foot = tk.Label(root, text="D  chemistry   S  speckle   T  demo   X  scan+sign   "
+                           "B  SIGN WITH BLOOD   L  dry/live   W  lights   Q  quit",
+                font=SMALL, fg=DIM, bg=BG)
+foot.pack(side="bottom", pady=(2, 5))
+
+
+def panel(parent, title, **pk):
+    f = tk.Frame(parent, bg=PANEL, highlightbackground="#243040",
+                 highlightthickness=1)
+    f.pack(**pk)
+    tk.Label(f, text=title, font=HEAD, fg=DIM, bg=PANEL,
+             anchor="w").pack(fill="x", padx=8, pady=(3, 1))
+    return f
+
+
+# --- band 1: the two cameras and the pulse gate ---------------------------
+top = tk.Frame(root, bg=BG); top.pack(fill="x", padx=12)
+cams = tk.Frame(top, bg=BG); cams.pack(side="left")
+
 
 def cam_pane(title, note):
-    p = tk.Frame(cams, bg=PANEL, highlightbackground="#243040",
-                 highlightthickness=1)
-    p.pack(fill="both", expand=True, pady=(0, 10))
-    tk.Label(p, text=title, font=("DejaVu Sans Mono", 11), fg=DIM, bg=PANEL,
-             anchor="w").pack(fill="x", padx=8, pady=(6, 0))
-    tk.Label(p, text=note, font=("DejaVu Sans Mono", 10), fg="#4a5563",
+    p = panel(cams, title, side="left", padx=(0, 8))
+    tk.Label(p, text=note, font=("DejaVu Sans Mono", 9), fg="#4a5563",
              bg=PANEL, anchor="w").pack(fill="x", padx=8)
-    hold = tk.Frame(p, bg="#05070a", width=340, height=232)
-    hold.pack(padx=8, pady=8); hold.pack_propagate(False)
+    hold = tk.Frame(p, bg="#05070a", width=224, height=128)
+    hold.pack(padx=8, pady=(4, 8)); hold.pack_propagate(False)
     lab = tk.Label(hold, bg="#05070a"); lab.pack(fill="both", expand=True)
     return hold, lab
 
-hold_pi, cv_pi = cam_pane("PI CAMERA", "speckle path - lensless, laser lit")
-hold_qr, cv_qr = cam_pane("QR CAMERA", "USB /dev/video1 - transaction in")
 
-pp = tk.Frame(right, bg=PANEL, highlightbackground="#243040", highlightthickness=1)
-pp.pack(fill="x", pady=(0, 10))
-tk.Label(pp, text="PULSE GATE   MAX3010x 0x57   touch tier", font=("DejaVu Sans Mono", 11),
-         fg=DIM, bg=PANEL, anchor="w").pack(fill="x", padx=10, pady=(6, 2))
+hold_pi, cv_pi = cam_pane("PI CAMERA", "lensless, laser lit")
+hold_qr, cv_qr = cam_pane("QR CAMERA", "USB - transaction in")
+
+pp = panel(top, "PULSE GATE   MAX3010x 0x57   touch tier",
+           side="left", fill="both", expand=True)
 l_pulse = tk.Label(pp, text="rest a finger on the sensor", font=MB, fg=DIM,
                    bg=PANEL, anchor="w", justify="left")
-l_pulse.pack(fill="x", padx=10, pady=(0, 8))
+l_pulse.pack(fill="both", expand=True, padx=10, pady=(2, 6))
 
-cp = tk.Frame(right, bg=PANEL, highlightbackground="#243040",
-              highlightthickness=1)
-cp.pack(fill="x", pady=(0, 10))
-tk.Label(cp, text="SPECTROMETER   AS7341 0x39   live colour at the read spot",
-         font=("DejaVu Sans Mono", 11), fg=DIM, bg=PANEL,
-         anchor="w").pack(fill="x", padx=10, pady=(6, 2))
+# --- band 2: colour, and the six gates ------------------------------------
+mid = tk.Frame(root, bg=BG); mid.pack(fill="x", padx=12, pady=(8, 0))
+
+cp = panel(mid, "SPECTROMETER   AS7341 0x39   live colour",
+           side="left", fill="x")
 crow = tk.Frame(cp, bg=PANEL); crow.pack(fill="x", padx=10)
-sw = tk.Canvas(crow, width=58, height=44, bg="#05070a", highlightthickness=1,
+sw = tk.Canvas(crow, width=40, height=30, bg="#05070a", highlightthickness=1,
                highlightbackground="#243040")
 sw.pack(side="left")
-l_col = tk.Label(crow, text="--", font=BIG, fg=INK, bg=PANEL, anchor="w")
-l_col.pack(side="left", padx=14)
-l_ctot = tk.Label(crow, text="", font=M, fg=DIM, bg=PANEL, anchor="w")
+l_col = tk.Label(crow, text="--", font=("DejaVu Sans Mono", 15, "bold"),
+                 fg=INK, bg=PANEL, anchor="w")
+l_col.pack(side="left", padx=10)
+l_ctot = tk.Label(crow, text="", font=SMALL, fg=DIM, bg=PANEL, anchor="w")
 l_ctot.pack(side="left")
-spec_cv = tk.Canvas(cp, height=96, bg="#0b0e12", highlightthickness=1,
-                    highlightbackground="#243040")
-spec_cv.pack(fill="x", padx=10, pady=(8, 10))
+spec_cv = tk.Canvas(cp, width=540, height=62, bg="#0b0e12",
+                    highlightthickness=1, highlightbackground="#243040")
+spec_cv.pack(padx=10, pady=(4, 8))
 
-rows = tk.Frame(right, bg=BG); rows.pack(fill="x")
+rows = tk.Frame(mid, bg=BG); rows.pack(side="left", fill="both",
+                                       expand=True, padx=(10, 0))
 GROWS = []
 for i in range(6):
     f = tk.Frame(rows, bg=BG); f.pack(fill="x")
-    name = tk.Label(f, text="", font=MB, fg=DIM, bg=BG, width=16, anchor="w")
-    val = tk.Label(f, text="", font=MB, fg=INK, bg=BG, width=10, anchor="e")
-    lim = tk.Label(f, text="", font=M, fg=DIM, bg=BG, width=14, anchor="w")
-    det = tk.Label(f, text="", font=M, fg=DIM, bg=BG, anchor="w",
-                   justify="left", wraplength=620)
-    for w in (name, val, lim, det): w.pack(side="left", padx=(0, 10))
+    name = tk.Label(f, text="", font=SMALL, fg=DIM, bg=BG, width=17, anchor="w")
+    val = tk.Label(f, text="", font=("DejaVu Sans Mono", 10, "bold"), fg=INK,
+                   bg=BG, width=9, anchor="e")
+    lim = tk.Label(f, text="", font=SMALL, fg=DIM, bg=BG, width=11, anchor="w")
+    det = tk.Label(f, text="", font=SMALL, fg=DIM, bg=BG, anchor="w",
+                   justify="left", wraplength=560)
+    for w in (name, val, lim, det):
+        w.pack(side="left", padx=(0, 6))
     GROWS.append((name, val, lim, det))
 
-sp_ = tk.Frame(right, bg=PANEL, highlightbackground="#243040", highlightthickness=1)
-sp_.pack(fill="x", pady=(10, 0))
-l_sh = tk.Label(sp_, text="SIGN WITH PULSE   press T", font=("DejaVu Sans Mono", 11),
-                fg=DIM, bg=PANEL, anchor="w")
-l_sh.pack(fill="x", padx=10, pady=(6, 2))
-l_sign = tk.Label(sp_, text="idle", font=M, fg=DIM, bg=PANEL, anchor="w",
-                  justify="left")
-l_sign.pack(fill="x", padx=10, pady=(0, 8))
+# --- band 3: what is being signed, and the speckle trace ------------------
+bot = tk.Frame(root, bg=BG); bot.pack(fill="both", expand=True, padx=12,
+                                      pady=(8, 0))
+sp_ = panel(bot, "SIGN   T demo   X scan a QR and sign it",
+            side="left", fill="both")
+l_sh = tk.Label(sp_, text="", font=("DejaVu Sans Mono", 9), fg=DIM, bg=PANEL,
+                anchor="w")
+l_sh.pack(fill="x", padx=10)
+l_sign = tk.Label(sp_, text="idle", font=SMALL, fg=DIM, bg=PANEL, anchor="nw",
+                  justify="left", width=46)
+l_sign.pack(fill="both", expand=True, padx=10, pady=(0, 6))
 
-# The footer is packed FIRST against the bottom edge: Tk hands out space in
-# packing order, so a footer added after an expand=True canvas gets pushed
-# off the screen entirely.
-foot = tk.Label(root, text="D  chemistry    S  speckle    T  demo sign    "
-                           "X  scan + sign    L  dry/live    W  lights    Q  quit",
-                font=M, fg=DIM, bg=BG)
-foot.pack(side="bottom", pady=(6, 10))
-
-plotf = tk.Frame(root, bg=BG)
-plotf.pack(fill="both", expand=True, padx=18, pady=(12, 0))
+plotf = tk.Frame(bot, bg=BG); plotf.pack(side="left", fill="both",
+                                         expand=True, padx=(10, 0))
 cv = tk.Canvas(plotf, bg="#0b0e12", highlightthickness=1,
-               highlightbackground="#243040", height=260)
+               highlightbackground="#243040", height=120)
 cv.pack(fill="both", expand=True)
-
-
 
 
 def to_photo(arr, w, h):
@@ -621,6 +853,35 @@ def draw_colour():
                             fill=DIM, font=("DejaVu Sans Mono", 9))
         spec_cv.create_text((x0 + x1) / 2, y - 8, text=f"{val:.0f}",
                             fill=DIM, font=("DejaVu Sans Mono", 9))
+
+
+def show_signed_qr():
+    """Put the signature on the glass, full screen.
+
+    The signing path built this QR from the first version and then never drew
+    it, so a signature that existed could only be got at over SSH. On a device
+    whose entire claim is that nothing but pixels crosses the gap, the one
+    artefact that has to be on screen is this one. Full screen and high
+    contrast, because it is about to be read by a webcam.
+    """
+    import io
+    q = SCAN.get("qr")
+    if q is None:
+        return
+    top = tk.Toplevel(root)
+    top.configure(bg="white")
+    top.attributes("-fullscreen", True)
+    buf = io.BytesIO()
+    q.png(buf, scale=7, border=4, dark="#000000", light="#ffffff")
+    ph = tk.PhotoImage(data=base64.b64encode(buf.getvalue()).decode())
+    lab = tk.Label(top, image=ph, bg="white")
+    lab.image = ph
+    lab.pack(expand=True)
+    tk.Label(top, bg="white", fg="#111", font=("DejaVu Sans Mono", 13),
+             text="SIGNED -- scan this back into the browser."
+                  "   any key to close").pack(pady=6)
+    top.bind("<Key>", lambda e: top.destroy())
+    top.focus_force()
 
 
 def draw_plot():
@@ -693,6 +954,9 @@ IDLE = ("idle", "chem done", "done")
 
 
 def tick():
+    if SCAN.get("qr") is not None and not SCAN.get("shown"):
+        SCAN["shown"] = True
+        show_signed_qr()
     if LIGHTS["on"] and S["stage"] in IDLE:
         try:
             b = ensure_bench()
@@ -801,6 +1065,8 @@ def on_key(e):
         start(sign_with_pulse)
     elif k == "x":
         start(scan_and_sign)
+    elif k == "b" and S["stage"] in IDLE:
+        start(sign_with_blood)
     elif k == "l":
         SIGN["dry"] = not SIGN["dry"]
     elif k in ("space", "return") and S["stage"] == "advance":
