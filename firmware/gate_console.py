@@ -326,6 +326,119 @@ def chemistry(spec, bench):
     S["stage"] = "chem done"
 
 
+SCAN = {"qr": None, "parts": {}, "want": 0}
+
+
+def scan_and_sign(spec, bench):
+    """The whole airgap: camera -> QR -> gate -> signature -> QR back.
+
+    Neither half of this existed. The T key built its own Sepolia transaction,
+    so it could gate a signature but not sign what a browser handed it;
+    qrsign.py decoded a frame but from a FILE and behind no gate at all. A
+    device that can gate, and a device that can sign what you give it, are
+    only a wallet when they are the same path.
+
+    The pulse is read FRESH, after the transaction is on screen and never
+    before: authorising a signature on a reading taken before the owner saw
+    what they were signing is how a gate becomes decoration.
+    """
+    import base64, json, re
+    sys.path.insert(0, "upstream")
+    import blindtx, eth, ops, segno
+    from devkey import device_key
+    from cell4b import pulse as P
+
+    SIGN.update(stage="SCAN", txid="", ok=None,
+                lines=["hold the QR up to the USB camera"])
+    SCAN.update(qr=None, parts={}, want=0)
+
+    det = cv2.QRCodeDetector()
+    t0 = time.time()
+    while time.time() - t0 < 120:
+        f = QR["frame"]
+        if f is None:
+            time.sleep(0.1); continue
+        try:
+            txt, _, _ = det.detectAndDecode(cv2.cvtColor(f, cv2.COLOR_RGB2GRAY))
+        except Exception:
+            txt = ""
+        if txt:
+            m = re.match(r"^p(\d+)of(\d+)\s*(.*)$", txt.strip(), re.S)
+            if m:
+                SCAN["parts"][int(m.group(1))] = m.group(3)
+                SCAN["want"] = int(m.group(2))
+            else:
+                SCAN["parts"][1] = txt.strip()
+                SCAN["want"] = 1
+            got, want = len(SCAN["parts"]), SCAN["want"]
+            SIGN.update(lines=[f"frame {got} of {want}",
+                               "hold steady" if got < want else "assembled"])
+            if want and got >= want:
+                break
+        time.sleep(0.05)
+
+    if not SCAN["want"] or len(SCAN["parts"]) < SCAN["want"]:
+        SIGN.update(stage="REFUSED", ok=False,
+                    lines=["no complete QR seen in 120 s", "",
+                           "NOTHING WAS SIGNED"])
+        return
+
+    try:
+        body = "".join(SCAN["parts"][i] for i in sorted(SCAN["parts"]))
+        tx = json.loads(base64.b64decode(body))
+    except Exception as e:
+        SIGN.update(stage="REFUSED", ok=False,
+                    lines=[f"frame did not parse: {type(e).__name__}", "",
+                           "NOTHING WAS SIGNED"])
+        return
+
+    # Rebuilt from FIELDS, never from a digest handed to us. Which type it is
+    # decides what the owner is shown, so it is decided by the calldata being
+    # there -- not by a flag the page can set.
+    data = bytes.fromhex((tx.get("data") or "").removeprefix("0x"))
+    if data:
+        t = blindtx.BlindContractCall(
+            chain_id=tx["chain"], nonce=tx["nonce"],
+            max_priority_fee_per_gas=int(tx["maxPrio"], 16),
+            max_fee_per_gas=int(tx["maxFee"], 16),
+            gas_limit=tx["gas"], to=tx["to"],
+            value=int(tx["value"], 16), data=data)
+        shown, signer = t.render(), blindtx.sign
+    else:
+        t = eth.EthTransaction(
+            chain_id=tx["chain"], nonce=tx["nonce"],
+            max_priority_fee_per_gas=int(tx["maxPrio"], 16),
+            max_fee_per_gas=int(tx["maxFee"], 16),
+            gas_limit=tx["gas"], to=tx["to"], value=int(tx["value"], 16))
+        shown = ops.EthereumSpend(
+            amount_wei=t.value, destination=t.to, chain_id=t.chain_id,
+            chain_name=t.chain_name(), nonce=t.nonce,
+            max_fee_wei=t.max_fee_wei()).render()
+        signer = eth.sign
+
+    SIGN.update(stage="PULSE",
+                lines=shown + ["", "hold your finger still -- 10 s"])
+    time.sleep(0.6)
+    with PULSE_LOCK, I2C_LOCK:
+        q = P.read_pulse(seconds=10.0)
+    if not q.present:
+        SIGN.update(stage="REFUSED", ok=False, lines=shown + [
+            "", f"bpm {q.bpm:.0f}  conf {q.confidence:.2f}  "
+                f"perfusion {q.perfusion:.2f}",
+            q.reason or "no living finger", "", "NOTHING WAS SIGNED"])
+        return
+
+    r, s_, y = signer(t, device_key())
+    raw = "0x" + t.encode_signed(r, s_, y).hex()
+    SCAN["qr"] = segno.make(raw, error="l")
+    txid = t.txid(r, s_, y)
+    SIGN.update(stage="SIGNED", ok=True, txid=txid, lines=shown + [
+        "", f"bpm {q.bpm:.0f}  conf {q.confidence:.2f}  "
+            f"perfusion {q.perfusion:.2f}",
+        "PULSE PRESENT -- signed", "", f"txid {txid}",
+        "scan the QR back into the browser"])
+
+
 def speckle(spec, bench, seconds=600):
     """G5/G6. Reads the shared camera stream while the laser is on."""
     S["stage"] = "speckle"; S["speckle"] = []; S["t0"] = time.time()
@@ -443,8 +556,8 @@ l_sign.pack(fill="x", padx=10, pady=(0, 8))
 # The footer is packed FIRST against the bottom edge: Tk hands out space in
 # packing order, so a footer added after an expand=True canvas gets pushed
 # off the screen entirely.
-foot = tk.Label(root, text="D  chemistry    S  speckle    T  sign with pulse    "
-                           "L  dry/live    W  lights    Q  quit",
+foot = tk.Label(root, text="D  chemistry    S  speckle    T  demo sign    "
+                           "X  scan + sign    L  dry/live    W  lights    Q  quit",
                 font=M, fg=DIM, bg=BG)
 foot.pack(side="bottom", pady=(6, 10))
 
@@ -686,6 +799,8 @@ def on_key(e):
         start(speckle)
     elif k == "t":
         start(sign_with_pulse)
+    elif k == "x":
+        start(scan_and_sign)
     elif k == "l":
         SIGN["dry"] = not SIGN["dry"]
     elif k in ("space", "return") and S["stage"] == "advance":
