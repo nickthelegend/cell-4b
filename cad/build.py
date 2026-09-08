@@ -37,11 +37,10 @@ PRINT_SETTINGS = {
                   "well-side up, no supports"),
     "cartridge_reference": ("white PLA", "as cartridge", "well-side up"),
     "cartridge_null": ("white PLA", "as cartridge", "flat, no supports"),
-    "aperture_tube": ("black PLA", "0.12 mm, 4 perim, 100%",
-                      "FLANGE DOWN; paint the bore matte black"),
     "optical_head": ("black PLA", "0.12 mm, 6 perim, 40%",
-                     "base down, no supports; paint ALL bores matte black"),
-    "sensor_deck": ("black PLA", "0.16 mm, 4 perim, 60%", "flat"),
+                     "legs down, no supports (it bridges 17.8 mm over the "
+                     "cartridge channel); paint ALL bores matte black; "
+                     "HOT-GLUE the three legs to the case floor"),
     "slot_baffle": ("black PLA", "0.16 mm, 4 perim, 100%", "flat"),
     "window_jig": ("any", "0.2 mm, 2 perim, 20%", "flat; not a device part"),
     "shell_lower": ("black PLA", "0.16 mm, 4 perim, 25%",
@@ -49,24 +48,23 @@ PRINT_SETTINGS = {
     "shell_upper": ("black PLA", "0.16 mm, 4 perim, 25%",
                     "TOP FACE DOWN, no supports"),
     "oled_bezel": ("black PLA", "0.12 mm, 4 perim, 100%", "flat, front face down"),
-    "sensor_carrier": ("black PLA", "0.16 mm, 4 perim, 100%",
-                       "flat; SYMMETRIC -- it clamps the AS7341 either way up"),
-    "touch_collar": ("black PLA", "0.12 mm, 5 perim, 40%",
-                     "base down; paint the bores matte black"),
 }
 
 PLATES = [
-    # One case plate. The P1S bed is 256 mm and these pack to well under it, so
-    # the shells and every small part go down in a single run rather than three.
-    # They do NOT share a process: the shells are 0.16 mm and the optics 0.12 mm,
-    # so this plate needs per-object layer heights in the slicer -- see MANIFEST.
-    ("Plate 1 - case + optics",
-     ["shell_lower", "shell_upper",
-      "optical_head", "sensor_deck", "touch_collar", "aperture_tube",
-      "slot_baffle", "oled_bezel", "sensor_carrier", "window_jig"]),
+    # Shells and optics used to share one plate, on the grounds that they packed
+    # under the 256 mm bed. The head growing legs and a spectro boss ended that --
+    # the combined plate went over the bed. Splitting them is no loss and
+    # arguably a gain: they never shared a PROCESS either (shells 0.16 mm,
+    # optics 0.12 mm), so the single plate always needed per-object layer
+    # heights set by hand in the slicer. Two plates, two processes, no fiddling.
+    ("Plate 1 - shells",
+     ["shell_lower", "shell_upper", "window_jig"]),
+    ("Plate 2 - optics",
+     ["optical_head",
+      "slot_baffle", "oled_bezel"]),
     # Cartridges stay on their own plate. They are the one part with ironing on,
     # and they are consumable -- you reprint these without touching the case.
-    ("Plate 2 - cartridges",
+    ("Plate 3 - cartridges",
      ["cartridge"] * 20 + ["cartridge_reference", "cartridge_null"]),
 ]
 
@@ -215,12 +213,9 @@ def main():
         ("3 - emitters into the head", ["mock_leds", "mock_laser", "mock_camera"]),
         ("4 - optical head down", ["optical_head"]),
         ("5 - CSI ribbon routed", ["mock_csi_ribbon"]),
-        ("6 - aperture tube", ["aperture_tube"]),
-        ("7 - sensor deck", ["sensor_deck"]),
-        ("8 - AS7341 on the flip-mount", ["mock_as7341", "sensor_carrier"]),
-        ("9 - touch collar + its LEDs", ["touch_collar", "mock_touch_leds"]),
-        ("10 - cartridge in to stop 2", ["mock_cartridge"]),
-        ("11 - upper shell, OLED, windows",
+        ("7 - AS7341 on the spectro boss", ["mock_as7341"]),
+        ("8 - cartridge in to stop 2", ["mock_cartridge"]),
+        ("9 - upper shell, OLED, windows",
          ["shell_upper", "mock_oled", "oled_bezel", "mock_touch_window"]),
     ]
 
@@ -253,10 +248,8 @@ def main():
         "shell_lower": 0, "mock_pi4b": 0, "mock_switch": 0, "slot_baffle": 0,
         "mock_leds": 1, "mock_laser": 1, "mock_camera": 1,
         "optical_head": 2, "mock_csi_ribbon": 2,
-        "aperture_tube": 3, "sensor_deck": 4,
-        "mock_as7341": 5, "sensor_carrier": 5,
-        "touch_collar": 6, "mock_touch_leds": 6,
-        "mock_cartridge": 1,
+        "mock_as7341": 4,
+        "mock_cartridge": 5,
         "shell_upper": 8, "mock_oled": 8, "oled_bezel": 9,
         "mock_touch_window": 9,
     }
@@ -272,8 +265,6 @@ def main():
     # completely invisible in every other view.
     placed = P.assembly()
     cut = [("optical_head", placed["optical_head"], "#5A6270", 0.28),
-           ("sensor_deck", placed["sensor_deck"], "#5A6270", 0.35),
-           ("aperture_tube", placed["aperture_tube"], "#2E3238", 1.0),
            ("slot_baffle", placed["slot_baffle"], "#2E3238", 1.0)]
     for n, m, c, a in mock_items:
         if n in ("mock_oled", "mock_touch_window"):

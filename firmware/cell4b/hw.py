@@ -71,7 +71,10 @@ LASER_FITTED = True
 BENCH_NO_INTERLOCK = False
 
 # --- ASSEMBLY.md section 5 -------------------------------------------------
-PIN_WHITE_1 = 12
+PIN_WHITE_1 = 13          # was GPIO12 (header pin 32). A short on this
+                          # emitter's leg pulled 5V onto the pin and reset
+                          # the board three times; GPIO12 stopped driving
+                          # and never recovered. Moved to header pin 33.
 PIN_WHITE_2 = 16          # CELL-4B's addition; upstream drove this from the
                           # AS7341's LDR pin, which no breakout exposes.
 PIN_IR_940 = 23

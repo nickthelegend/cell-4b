@@ -1,0 +1,278 @@
+{
+ "steps": [
+  {
+   "node": "shell_lower",
+   "step": 0,
+   "label": "Lower shell",
+   "detail": "the base everything else lands on",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 0
+  },
+  {
+   "node": "mock_pi4b",
+   "step": 1,
+   "label": "Raspberry Pi 4B",
+   "detail": "4 x M2.5 into the 58 x 49 bosses",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 42
+  },
+  {
+   "node": "mock_switch",
+   "step": 2,
+   "label": "Cartridge switch",
+   "detail": "lever into the channel; also the laser interlock",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 26
+  },
+  {
+   "node": "slot_baffle",
+   "step": 3,
+   "label": "Slot baffle",
+   "detail": "6 mm behind the mouth, notched for the switch",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 26
+  },
+  {
+   "node": "mock_led1",
+   "step": 4,
+   "label": "White LED #1",
+   "detail": "45 deg bore, azimuth 45, seats at 12.00 mm",
+   "vec": [
+    0.5,
+    0.4999999999999999,
+    0.7071067811865476
+   ],
+   "dist": 46
+  },
+  {
+   "node": "mock_led2",
+   "step": 4,
+   "label": "White LED #2",
+   "detail": "45 deg bore, azimuth 225, seats at 12.00 mm",
+   "vec": [
+    -0.5000000000000001,
+    -0.4999999999999999,
+    0.7071067811865476
+   ],
+   "dist": 46
+  },
+  {
+   "node": "mock_ir",
+   "step": 4,
+   "label": "940 nm IR LED",
+   "detail": "45 deg bore, azimuth 135, seats at 12.00 mm",
+   "vec": [
+    -0.4999999999999999,
+    0.5,
+    0.7071067811865476
+   ],
+   "dist": 46
+  },
+  {
+   "node": "mock_laser",
+   "step": 5,
+   "label": "650 nm laser",
+   "detail": "30 deg, azimuth 270 -- exits the head's top",
+   "vec": [
+    -9.184850993605147e-17,
+    -0.49999999999999994,
+    0.8660254037844387
+   ],
+   "dist": 46
+  },
+  {
+   "node": "mock_camera",
+   "step": 6,
+   "label": "OV5647 camera",
+   "detail": "45 deg, 20.00 mm, lens removed",
+   "vec": [
+    0.7071067811865475,
+    0.0,
+    0.7071067811865476
+   ],
+   "dist": 52
+  },
+  {
+   "node": "optical_head",
+   "step": 7,
+   "label": "Optical head",
+   "detail": "down onto its three lugs -- 115, 180, 305 deg",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 60
+  },
+  {
+   "node": "mock_csi_ribbon",
+   "step": 8,
+   "label": "CSI ribbon",
+   "detail": "110 mm: out +X, on edge, over the header",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 34
+  },
+  {
+   "node": "aperture_tube",
+   "step": 9,
+   "label": "Aperture tube",
+   "detail": "flange up -- this fixes the 3 mm spot",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 30
+  },
+  {
+   "node": "sensor_deck",
+   "step": 10,
+   "label": "Sensor deck",
+   "detail": "three ears, one M2.5 each -- none through the middle",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 34
+  },
+  {
+   "node": "mock_as7341",
+   "step": 11,
+   "label": "AS7341",
+   "detail": "4 x M2 at 25.5 x 18.0 -- flat deck, no screw heads",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 30
+  },
+  {
+   "node": "sensor_carrier",
+   "step": 12,
+   "label": "Flip-mount carrier",
+   "detail": "symmetric -- clamps the board either way up",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 26
+  },
+  {
+   "node": "touch_collar",
+   "step": 13,
+   "label": "Touch collar",
+   "detail": "carries the touch LEDs, aimed UP",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 30
+  },
+  {
+   "node": "mock_touch_leds",
+   "step": 14,
+   "label": "Touch LEDs",
+   "detail": "white + IR at 45 deg / 12 mm, at the fingertip",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 30
+  },
+  {
+   "node": "mock_cartridge",
+   "step": 15,
+   "label": "Cartridge",
+   "detail": "slides to STOP2 -- well on the read spot",
+   "vec": [
+    0,
+    -1,
+    0
+   ],
+   "dist": 62
+  },
+  {
+   "node": "mock_oled",
+   "step": 16,
+   "label": "1.3in OLED",
+   "detail": "four posts under the ceiling",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 30
+  },
+  {
+   "node": "mock_touch_window",
+   "step": 17,
+   "label": "Ring window",
+   "detail": "into its rebate from BELOW",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 24
+  },
+  {
+   "node": "shell_upper",
+   "step": 18,
+   "label": "Upper shell",
+   "detail": "closes the lap joint",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 74
+  },
+  {
+   "node": "oled_bezel",
+   "step": 19,
+   "label": "OLED bezel",
+   "detail": "masks the window to the active area",
+   "vec": [
+    0,
+    0,
+    1
+   ],
+   "dist": 26
+  }
+ ],
+ "readSpot": [
+  0.0,
+  -32.4,
+  5.4
+ ],
+ "env": [
+  92.0,
+  128.0,
+  59.8
+ ]
+}

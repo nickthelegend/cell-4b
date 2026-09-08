@@ -70,6 +70,25 @@ def camera_body():
     return on_axis(m, tilt, az)
 
 
+def as7341_body():
+    """The breakout on the spectro boss, chip facing in down the shaft.
+
+    Lives here rather than in mocks so that sensor_deck() can be cut to clear
+    it without parts importing mocks -- the same reason the camera body does.
+    """
+    from partlib import circle, rounded_rect
+    from shapely.ops import unary_union
+    s = S.SPECTRO_STANDOFF
+    m = Mesh()
+    holes = unary_union([circle(S.AS_HOLE_D, 20,
+                                sx * S.AS_HOLE_DX / 2, sy * S.AS_HOLE_DY / 2)
+                         for sx in (-1, 1) for sy in (-1, 1)])
+    m += prism(rounded_rect(S.AS_PCB_L, S.AS_PCB_W, 2.0).difference(holes),
+               s, s + S.AS_PCB_T)
+    m += prism(circle(3.0, 24), s - 1.0, s)
+    return on_axis(m, S.SPECTRO_ANGLE, S.AZ_SPECTRO)
+
+
 # --------------------------------------------------------------------------
 # clearance envelopes the head has to make room for
 # --------------------------------------------------------------------------
@@ -97,10 +116,16 @@ def head_pockets(pad=None):
     The LEDs are NOT here: a 5 mm LED slides down its own Ø5.4 bore and needs
     nothing else. The laser barrel and the camera board are both wider than
     their bores, so they need real pockets.
+
+    The laser barrel is a slip fit in a bore (FIT); the camera is a PCB
+    dropped into a recess, which is what PCB_FIT is for. Z gets a further
+    S.HEAD_DZ at both ends -- see the note on HEAD_DZ in spec.py.
     """
-    pad = S.FIT if pad is None else pad
     out = []
-    for body in (laser_body(), camera_body()):
+    for body, fit in ((laser_body(), S.FIT if pad is None else pad),
+                      (camera_body(), S.PCB_FIT if pad is None else pad)):
         z0, z1 = z_range(body)
-        out.append((xy_envelope(body, pad), z0 - pad, min(z1 + pad, S.HEAD_TOP)))
+        out.append((xy_envelope(body, fit),
+                    z0 - fit - S.HEAD_DZ,
+                    min(z1 + fit + S.HEAD_DZ, S.HEAD_TOP)))
     return out

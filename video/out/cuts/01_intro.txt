@@ -1,0 +1,2 @@
+CELL 4B is a Raspberry Pi 4B enclosure for CELL, an open source
+hardware wallet that reads a drop of blood.

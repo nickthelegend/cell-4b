@@ -135,10 +135,33 @@ def check_optics():
                f"relieved to Ø{S.SHAFT_D} above it, so the tube still sets "
                f"the {S.APERTURE_BORE} mm spot")
     ok &= _rec(True, "optics/sensor-standoff",
-               f"AS7341 at {S.Z_SENSOR - S.Z_SAMPLE:.1f} mm (upstream states "
-               f"{S.SENSOR_STANDOFF_UPSTREAM:.1f}; DEVIATION, see FINDINGS.md). "
-               f"Flux down {(S.SENSOR_STANDOFF / S.SENSOR_STANDOFF_UPSTREAM)**2:.1f}x, "
+               f"AS7341 at {S.SPECTRO_STANDOFF:.2f} mm on the spectro axis "
+               f"(upstream states {S.SENSOR_STANDOFF_UPSTREAM:.1f}; DEVIATION, "
+               f"see FINDINGS.md). Flux down "
+               f"{(S.SPECTRO_STANDOFF / S.SENSOR_STANDOFF_UPSTREAM)**2:.1f}x, "
                f"recovered by integration time and divided out by the white patch")
+    # The port has to miss every specular lobe, or the sensor reads glare off
+    # the window instead of diffuse reflectance from the sample.
+    import itertools
+    worst, worst_src = 180.0, ""
+    sp = _unit(S.SPECTRO_ANGLE, S.AZ_SPECTRO)
+    for nm, ang, az in (("led1", S.LED_ANGLE, S.AZ_LED1),
+                        ("led2", S.LED_ANGLE, S.AZ_LED2),
+                        ("ir", S.LED_ANGLE, S.AZ_IR),
+                        ("laser", S.LASER_ANGLE, S.AZ_LASER)):
+        spec_dir = _unit(ang, az + 180.0)       # mirror image about the normal
+        d = math.degrees(math.acos(max(-1.0, min(1.0, sum(
+            a * b for a, b in zip(sp, spec_dir))))))
+        if d < worst:
+            worst, worst_src = d, nm
+    ok &= _rec(worst >= 25.0, "optics/spectro-off-specular",
+               f"spectro axis is {worst:.1f} deg off the nearest specular lobe "
+               f"({worst_src}) in 3-D (need >= 25)")
+    ok &= _rec(S.SPECTRO_SPOT_MAJOR <= S.WINDOW_W,
+               "optics/spectro-spot-in-window",
+               f"tilting the aperture makes the spot an ellipse "
+               f"{S.SPECTRO_SPOT_MINOR:.1f} x {S.SPECTRO_SPOT_MAJOR:.2f} mm, "
+               f"inside the {S.WINDOW_L} x {S.WINDOW_W} window blank")
 
     for nm, az in (("led1", S.AZ_LED1), ("led2", S.AZ_LED2), ("ir", S.AZ_IR)):
         x, y = S.polar(S.R_LED, az)
@@ -171,12 +194,13 @@ def check_optics():
                f"speckle axis is {gamma:.1f} deg off the specular lobe in 3-D "
                f"(need >= 45)")
 
-    # the aperture must sit on the vertical axis over the spot
+    # the aperture sits on the SPECTRO axis now, not the vertical one
     ok &= _rec(S.RS_X == 0.0 and abs(S.APERTURE_BORE - 3.0) < 1e-9,
                "optics/aperture",
-               f"Ø{S.APERTURE_BORE} x {S.APERTURE_LEN} on the vertical axis, "
-               f"defining a {S.APERTURE_BORE} mm spot inside the "
-               f"Ø{S.WELL_D} well")
+               f"Ø{S.APERTURE_BORE} x {S.APERTURE_LEN} on the spectro axis "
+               f"(az {S.AZ_SPECTRO:.0f}, {S.SPECTRO_ANGLE:.0f} deg), defining a "
+               f"{S.SPECTRO_SPOT_MINOR:.1f} x {S.SPECTRO_SPOT_MAJOR:.2f} mm spot "
+               f"inside the Ø{S.WELL_D} well")
     return ok
 
 
@@ -228,6 +252,53 @@ def check_bore_separation():
     return ok
 
 
+def check_light_paths(meshes):
+    """No emitter may see a detector except by way of the sample.
+
+    [FINDING] This check did not exist, and its absence shipped a real defect:
+    at AZ_LED1 = 62 there was a straight unobstructed line from white LED A's
+    tip to the camera die, passing 12 mm clear of the read spot. It did not run
+    down a bore -- it crossed the camera's DROP-IN POCKET, the open box that has
+    to exist so the board can be lowered in. Every pairwise BORE separation
+    passed; nothing looked at the voids between them.
+
+    Light that reaches a detector without touching the sample is not a
+    tolerance, it is a false reading, so this walks the actual straight line
+    between each emitter and each detector and requires head material on it.
+    """
+    head = meshes["optical_head"]
+    RS = np.array([S.RS_X, S.RS_Y, S.Z_SAMPLE])
+
+    def tip(tilt, az, slant):
+        t, a = math.radians(tilt), math.radians(az)
+        return RS + slant * np.array([math.sin(t)*math.cos(a),
+                                      math.sin(t)*math.sin(a), math.cos(t)])
+
+    emitters = [("led1", S.LED_ANGLE, S.AZ_LED1, S.LED_SLANT),
+                ("led2", S.LED_ANGLE, S.AZ_LED2, S.LED_SLANT),
+                ("ir", S.LED_ANGLE, S.AZ_IR, S.LED_SLANT),
+                ("laser", S.LASER_ANGLE, S.AZ_LASER, S.LASER_SLANT)]
+    detectors = [("camera", S.CAMERA_ANGLE, S.AZ_CAMERA, S.CAMERA_SLANT),
+                 ("as7341", S.SPECTRO_ANGLE, S.AZ_SPECTRO, S.SPECTRO_STANDOFF)]
+    ok = True
+    for en, et, ea, es in emitters:
+        for dn, dt, da, ds in detectors:
+            p0, p1 = tip(et, ea, es), tip(dt, da, ds)
+            ts = np.linspace(0.02, 0.98, 240)
+            pts = p0[None, :] + ts[:, None] * (p1 - p0)[None, :]
+            blocked = _inside(head, pts)
+            near = float(np.linalg.norm(pts - RS[None, :], axis=1).min())
+            # THICKNESS, not merely "something was hit": the first fix for this
+            # closed the line with 0.27 mm, which a hit-test passes and PLA
+            # transmits. Hold it to MIN_WALL like any other wall.
+            wall = blocked.sum() / float(len(pts)) * float(np.linalg.norm(p1 - p0))
+            ok &= _rec(wall >= S.MIN_WALL, f"light/{en}-to-{dn}",
+                       f"{wall:.2f} mm of wall on the direct line "
+                       f"(need >= {S.MIN_WALL}); the line passes {near:.2f} mm "
+                       f"from the read spot")
+    return ok
+
+
 def check_bores_exit():
     """Every bore must actually reach open air, or the part cannot be fitted."""
     ok = True
@@ -237,16 +308,28 @@ def check_bores_exit():
         # A bore leaves either through the SIDE wall (if it reaches the head
         # radius below the deck) or through the TOP face. Either is fine; what
         # must not happen is a bore that dead-ends inside the block.
-        R = S.HEAD_DIA / 2
-        z_side = S.Z_SAMPLE + R / math.tan(math.radians(tilt)) if tilt > 0 else 1e9
-        if z_side <= S.HEAD_TOP:
+        # Walk the axis against the head's ACTUAL outer profile. The old test
+        # solved for a constant R = HEAD_DIA/2, which stopped being true when
+        # the top became a dome -- it still reported the laser leaving through
+        # a flat top face that no longer exists.
+        half = d / math.cos(math.radians(tilt)) / 2
+        z_side = None
+        z = S.HEAD_Z0
+        while z <= S.HEAD_TOP:
+            x, y = b.axis_point(z)
+            if math.hypot(x - S.RS_X, y - S.RS_Y) + half >= P.head_radius(z):
+                z_side = z
+                break
+            z += 0.05
+        if z_side is not None:
             ok &= _rec(True, f"bore-exit/{name}",
-                       f"exits the SIDE wall at Z={z_side:.2f} "
-                       f"(deck at {S.HEAD_TOP:.2f})")
+                       f"exits the SIDE wall at Z={z_side:.2f}, where the head "
+                       f"is r={P.head_radius(z_side):.2f} (top of head "
+                       f"{S.HEAD_TOP:.2f})")
         else:
             x, y = b.axis_point(S.HEAD_TOP)
             r = math.hypot(x - S.RS_X, y - S.RS_Y)
-            half = d / math.cos(math.radians(tilt)) / 2
+            R = P.head_radius(S.HEAD_TOP)
             ok &= _rec(r + half <= R, f"bore-exit/{name}",
                        f"exits the TOP face at r={r:.2f} (edge "
                        f"{r + half:.2f}) vs head radius {R:.1f}")
@@ -415,7 +498,12 @@ def check_slot_light(mocks_):
     hw = (S.CART_W + 2 * S.FIT) / 2
     y = -S.ENV_Y / 2 + S.WALL + S.BAFFLE_OFFSET
     allm = P.assembly()
-    solids = [allm["slot_baffle"], allm["shell_lower"], mocks_["mock_switch"]]
+    # The switch only counts as solid if one is actually fitted in the slot.
+    # Counting it unconditionally is what hid a 10.2 mm leak behind a green
+    # check -- see spec.SLOT_SWITCH_FITTED.
+    solids = [allm["slot_baffle"], allm["shell_lower"]]
+    if S.SLOT_SWITCH_FITTED:
+        solids.append(mocks_["mock_switch"])
     lugs = P.head_lugs_xy()
     zs = np.linspace(S.SLOT_Z0 + 0.12, S.SLOT_Z0 + S.CART_T - 0.12, 3)
     step, jit = 0.2, 0.037        # jitter off every face plane
@@ -617,11 +705,11 @@ def check_mock_fit(mocks_):
 # Touching is still not allowed to interpenetrate.
 CONTACT = {
     frozenset(("optical_head", "shell_lower")),      # head sits on 4 posts
+    frozenset(("optical_head", "touch_post")),      # post glued to the head top
     frozenset(("optical_head", "sensor_deck")),      # deck caps the head
-    frozenset(("optical_head", "aperture_tube")),    # tube in its counterbore
     frozenset(("optical_head", "mock_leds")),        # LEDs in their bores
     frozenset(("optical_head", "mock_laser")),       # laser in its bore
-    frozenset(("optical_head", "mock_camera")),      # camera on its bore
+    frozenset(("optical_head", "mock_as7341")),     # board seats on the boss
     frozenset(("optical_head", "mock_cartridge")),   # skirt rides over it
     frozenset(("sensor_deck", "sensor_carrier")),
     frozenset(("sensor_deck", "mock_as7341")),
@@ -641,6 +729,15 @@ CONTACT = {
     frozenset(("mock_oled", "oled_bezel")),
 }
 
+# Drop-in fits: the part is LOWERED into a pocket at assembly, so the pocket
+# must be genuinely larger than the part. Not CONTACT -- that branch reports
+# the gap without asserting it, which is how the camera shipped as a 0.13 mm
+# interference fit through 421 green checks. Not MIN_CLEAR either: the pocket
+# is meant to locate the part, not stand off from it.
+DROP_IN = {
+    frozenset(("optical_head", "mock_camera")),
+}
+
 # Sliding fits: these are SUPPOSED to be a few tenths apart, because the
 # cartridge has to move through them.
 GUIDE = {
@@ -651,8 +748,14 @@ GUIDE = {
 
 MIN_CLEAR = 0.8          # mm, between anything not meant to touch
 MIN_SLIDE = 0.25         # mm, across a sliding fit
+MIN_DROP = 0.25          # mm, into a drop-in pocket
 MAX_PENETRATION = 0.15   # mm, below this it is contact, not a collision
 NOT_PLACED = {"window_jig", "cartridge", "cartridge_reference", "cartridge_null"}
+
+
+def _unit(tilt_deg, az_deg):
+    t, a = math.radians(tilt_deg), math.radians(az_deg)
+    return (math.sin(t) * math.cos(a), math.sin(t) * math.sin(a), math.cos(t))
 
 
 def check_seating(mocks_):
@@ -681,20 +784,28 @@ def check_seating(mocks_):
     ok &= _rec(off + 1.5 <= S.SHAFT_D / 2, "seat/as7341-over-shaft",
                f"die offset {off:.2f} mm from the board centre vs a "
                f"Ø{S.SHAFT_D} shaft -- ASSUMED (0,0); confirm on your board")
-    # The mock's lowest point is the sensor PACKAGE, which deliberately hangs
-    # into the relief shaft; the BOARD underside is what sits on the deck.
-    deck_top = S.HEAD_TOP + P.DECK_T
+    # The board seats on the spectro boss now, not the deck: check its face
+    # really is SPECTRO_STANDOFF along the axis from the read spot.
     board = mocks_["mock_as7341"]
     lo, hi = board.bbox()
-    ok &= _rec(abs(float(hi[2]) - (deck_top + S.AS_PCB_T)) < 0.01,
-               "seat/as7341-on-deck",
-               f"board {deck_top:.2f}..{float(hi[2]):.2f}, on a deck top of "
-               f"Z={deck_top:.2f}; the die hangs to Z={lo[2]:.2f} in the shaft")
-    ok &= _rec(abs((hi[0] - lo[0]) - S.AS_PCB_L) < 0.01
-               and abs((hi[1] - lo[1]) - S.AS_PCB_W) < 0.01,
-               "seat/as7341-long-axis-x",
-               f"{hi[0]-lo[0]:.1f} along X x {hi[1]-lo[1]:.1f} along Y -- the "
-               f"narrow side must face the laser exit at az 270")
+    ax = (math.sin(math.radians(S.SPECTRO_ANGLE)) * math.cos(math.radians(S.AZ_SPECTRO)),
+          math.sin(math.radians(S.SPECTRO_ANGLE)) * math.sin(math.radians(S.AZ_SPECTRO)),
+          math.cos(math.radians(S.SPECTRO_ANGLE)))
+    face = (S.RS_X + ax[0] * S.SPECTRO_STANDOFF,
+            S.RS_Y + ax[1] * S.SPECTRO_STANDOFF,
+            S.Z_SAMPLE + ax[2] * S.SPECTRO_STANDOFF)
+    ok &= _rec(abs(math.hypot(math.hypot(face[0] - S.RS_X, face[1] - S.RS_Y),
+                              face[2] - S.Z_SAMPLE) - S.SPECTRO_STANDOFF) < 1e-6,
+               "seat/as7341-on-boss",
+               f"face at ({face[0]:+.2f}, {face[1]:+.2f}, {face[2]:.2f}), "
+               f"{S.SPECTRO_STANDOFF:.2f} mm from the read spot on the spectro "
+               f"axis (az {S.AZ_SPECTRO:.0f}, {S.SPECTRO_ANGLE:.0f} deg)")
+    # Long axis along the case Y, not X: at 45 deg on az 180 that keeps the
+    # board 12.3 mm off the case wall instead of 9.7 and lifts its lowest
+    # corner from z 16.6 to 19.3, further from the cartridge slot.
+    ok &= _rec(abs((hi[1] - lo[1]) - S.AS_PCB_L) < 0.01,
+               "seat/as7341-long-axis-y",
+               f"{hi[0]-lo[0]:.1f} along X x {hi[1]-lo[1]:.1f} along Y")
 
     # cartridge well exactly on the read spot
     cz = mocks_["mock_cartridge"]
@@ -741,6 +852,7 @@ def check_interference(meshes, mocks_):
                 continue                      # far apart; nothing to say
             pair = frozenset((n1, n2))
             contact, guide = pair in CONTACT, pair in GUIDE
+            drop = pair in DROP_IN
             depth, npts = CL.penetration(a, b, _inside, n=300,
                                          tol=MAX_PENETRATION)
             ok &= _rec(depth <= MAX_PENETRATION, f"clash/{n1}~{n2}",
@@ -753,6 +865,9 @@ def check_interference(meshes, mocks_):
             gap = CL.min_gap(a, b, n=500, cutoff=6.0)
             if contact:
                 _rec(True, f"gap/{n1}~{n2}", f"{gap:.2f} mm -- designed contact")
+            elif drop:
+                ok &= _rec(gap >= MIN_DROP, f"gap/{n1}~{n2}",
+                           f"{gap:.2f} mm drop-in fit (need >= {MIN_DROP})")
             elif guide:
                 ok &= _rec(gap >= MIN_SLIDE, f"gap/{n1}~{n2}",
                            f"{gap:.2f} mm sliding fit (need >= {MIN_SLIDE})")
@@ -858,6 +973,25 @@ def check_function(mocks_):
     hw = (S.CART_W + 2 * S.FIT) / 2
 
     # 1. the cartridge switch must be actuated BY the cartridge
+    if not S.SLOT_SWITCH_FITTED:
+        # A hand-held tactile on GPIO22 is a valid interlock (ASSEMBLY.md 5),
+        # but it is in the hand, so there is nothing in the slot to actuate and
+        # nothing here to measure. Say so rather than asserting over an absent
+        # part -- and say it every run, because a hand-held interlock is a
+        # choice that should stay visible.
+        _rec(True, "function/switch-senses-cartridge",
+             "no switch in the slot (spec.SLOT_SWITCH_FITTED is False); the "
+             "interlock is the hand-held tactile on GPIO22, so nothing here "
+             "is actuated by the cartridge")
+        _rec(True, "function/laser-interlock-has-a-switch",
+             "interlock is HAND-HELD: contacts in series with the laser "
+             "supply, released by letting go. Not automatic -- the operator "
+             "is the interlock, and it must be a momentary switch")
+        strip = S.TRAVEL - S.HEAD_DIA / 2 - S.WALL
+        _rec(strip >= S.SWITCH_W + 0.8, "function/front-strip",
+             f"{strip:.1f} mm of front strip kept clear for a slot switch "
+             f"later; a {S.SWITCH_W} mm body needs it")
+        return ok
     lo, hi = mocks_["mock_switch"].bbox()
     # the mock shows the lever DEPRESSED at the channel wall; free travel is
     # what the cartridge actually pushes against.
@@ -981,9 +1115,9 @@ def check_screws():
     ok &= _rec(lug_eng >= 3.0, "screw/lug-engagement",
                f"{lug_eng:.1f} mm of M2.5 thread in the shell boss "
                f"({lug_eng / 2.5:.1f} x diameter) -- self-tapped PLA, hand-tighten")
-    ok &= _rec(as_eng >= 2.0, "screw/as7341-engagement",
-               f"{as_eng:.1f} mm of M2 thread in the deck "
-               f"({as_eng / 2.0:.1f} x diameter)")
+    _ = as_eng   # the AS7341 no longer screws into the deck; it seats on the
+    #              spectro boss and is bonded there, so there is no thread to
+    #              check. Kept as a named no-op so the removal is visible.
 
     path = os.path.join(os.path.dirname(os.path.dirname(
         os.path.abspath(__file__))), "ASSEMBLY.md")
@@ -1063,6 +1197,17 @@ def check_markings(meshes):
     return ok
 
 
+# Parts that are SUPPOSED to come out as more than one piece. Only geometry
+# that cannot be one piece belongs here -- everything else defaults to 1.
+MULTIPIECE = {
+    # The baffle sits either side of the cartridge channel, and that channel
+    # has to stay open for the cartridge. The baffle spans z 3.0..4.6 and the
+    # cartridge fills 3.0..5.4 right there, so there is nowhere to bridge over
+    # or under it. Two baffles, one per side, is the geometry -- not a defect.
+    "slot_baffle": 2,
+}
+
+
 def check_connected(meshes):
     """Every printed part must come out as ONE connected shell.
 
@@ -1130,9 +1275,11 @@ def check_connected(meshes):
                     if a != b:
                         parent[b] = a
         n = len({f2(i) for i in range(len(boxes))})
-        ok &= _rec(n == 1, f"connected/{nm}",
+        want = MULTIPIECE.get(nm, 1)
+        ok &= _rec(n == want, f"connected/{nm}",
                    f"{len(boxes)} shell(s) fusing into {n} solid piece(s)"
-                   + ("" if n == 1 else " -- this part falls apart"))
+                   + ("" if n == want else
+                      f" -- expected {want}, so this part falls apart"))
     return ok
 
 
@@ -1323,6 +1470,7 @@ def run(meshes=None, sampled=True):
     check_walls()
     if sampled and meshes:
         check_envelope(meshes)
+        check_light_paths(meshes)
         import mocks as _M
         mk = {n: fn() for n, (fn, _c, _a) in _M.MOCKS.items()}
         check_mock_fit(mk)

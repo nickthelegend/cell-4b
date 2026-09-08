@@ -49,68 +49,20 @@
    "colour": "#E9EDF2"
   },
   {
-   "name": "aperture_tube",
-   "qty": 1,
-   "triangles": 800,
-   "volume_mm3": 185.76,
-   "watertight": true,
-   "bbox": [
-    10.0,
-    10.0,
-    7.0
-   ],
-   "material": "black PLA",
-   "settings": "0.12 mm, 4 perim, 100%",
-   "orientation": "FLANGE DOWN; paint the bore matte black",
-   "colour": "#2E3238"
-  },
-  {
    "name": "optical_head",
    "qty": 1,
-   "triangles": 137064,
-   "volume_mm3": 37944.8,
+   "triangles": 98700,
+   "volume_mm3": 30891.05,
    "watertight": true,
    "bbox": [
-    54.5,
-    57.31,
-    27.8
+    57.06,
+    60.78,
+    31.0
    ],
    "material": "black PLA",
    "settings": "0.12 mm, 6 perim, 40%",
-   "orientation": "base down, no supports; paint ALL bores matte black",
+   "orientation": "legs down, no supports (it bridges 17.8 mm over the cartridge channel); paint ALL bores matte black; HOT-GLUE the three legs to the case floor",
    "colour": "#2E3238"
-  },
-  {
-   "name": "sensor_deck",
-   "qty": 1,
-   "triangles": 1892,
-   "volume_mm3": 3957.69,
-   "watertight": true,
-   "bbox": [
-    54.5,
-    57.31,
-    2.4
-   ],
-   "material": "black PLA",
-   "settings": "0.16 mm, 4 perim, 60%",
-   "orientation": "flat",
-   "colour": "#2E3238"
-  },
-  {
-   "name": "touch_collar",
-   "qty": 1,
-   "triangles": 22344,
-   "volume_mm3": 3360.12,
-   "watertight": true,
-   "bbox": [
-    24.0,
-    24.0,
-    10.6
-   ],
-   "material": "black PLA",
-   "settings": "0.12 mm, 5 perim, 40%",
-   "orientation": "base down; paint the bores matte black",
-   "colour": "#3A4048"
   },
   {
    "name": "slot_baffle",
@@ -191,50 +143,42 @@
    "settings": "0.12 mm, 4 perim, 100%",
    "orientation": "flat, front face down",
    "colour": "#2E3238"
-  },
-  {
-   "name": "sensor_carrier",
-   "qty": 1,
-   "triangles": 736,
-   "volume_mm3": 781.86,
-   "watertight": true,
-   "bbox": [
-    35.5,
-    28.0,
-    1.4
-   ],
-   "material": "black PLA",
-   "settings": "0.16 mm, 4 perim, 100%",
-   "orientation": "flat; SYMMETRIC -- it clamps the AS7341 either way up",
-   "colour": "#2E3238"
   }
  ],
  "plates": [
   {
    "id": 1,
-   "title": "Plate 1 - case + optics",
+   "title": "Plate 1 - shells",
    "parts": {
     "shell_lower": 1,
     "shell_upper": 1,
-    "optical_head": 1,
-    "sensor_deck": 1,
-    "touch_collar": 1,
-    "aperture_tube": 1,
-    "slot_baffle": 1,
-    "oled_bezel": 1,
-    "sensor_carrier": 1,
     "window_jig": 1
    },
    "extent": [
-    243.5,
-    237.3
+    196.0,
+    182.0
    ],
    "fits_p1s": true,
    "glb": "plate1.glb"
   },
   {
    "id": 2,
-   "title": "Plate 2 - cartridges",
+   "title": "Plate 2 - optics",
+   "parts": {
+    "optical_head": 1,
+    "slot_baffle": 1,
+    "oled_bezel": 1
+   },
+   "extent": [
+    125.1,
+    60.8
+   ],
+   "fits_p1s": true,
+   "glb": "plate2.glb"
+  },
+  {
+   "id": 3,
+   "title": "Plate 3 - cartridges",
    "parts": {
     "cartridge": 20,
     "cartridge_reference": 1,
@@ -245,7 +189,7 @@
     177.0
    ],
    "fits_p1s": true,
-   "glb": "plate2.glb"
+   "glb": "plate3.glb"
   }
  ],
  "spec": {
@@ -271,13 +215,13 @@
     "name": "led1",
     "d": 5.4,
     "tilt": 45.0,
-    "az": 45.0
+    "az": 82.0
    },
    {
     "name": "led2",
     "d": 5.4,
     "tilt": 45.0,
-    "az": 225.0
+    "az": 262.0
    },
    {
     "name": "ir",
@@ -365,24 +309,10 @@
   }
  ],
  "audit": {
-  "checks": 421,
+  "checks": 355,
   "failed": 0
  },
  "gaps": [
-  {
-   "a": "mock_as7341",
-   "b": "sensor_carrier",
-   "kind": "contact",
-   "mm": 0.0,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_as7341",
-   "b": "sensor_deck",
-   "kind": "contact",
-   "mm": 0.0,
-   "status": "PASS"
-  },
   {
    "a": "mock_cartridge",
    "b": "shell_lower",
@@ -420,13 +350,6 @@
   },
   {
    "a": "optical_head",
-   "b": "sensor_deck",
-   "kind": "contact",
-   "mm": 0.0,
-   "status": "PASS"
-  },
-  {
-   "a": "optical_head",
    "b": "shell_lower",
    "kind": "contact",
    "mm": 0.0,
@@ -440,27 +363,6 @@
    "status": "PASS"
   },
   {
-   "a": "aperture_tube",
-   "b": "optical_head",
-   "kind": "contact",
-   "mm": 0.02,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_touch_leds",
-   "b": "touch_collar",
-   "kind": "contact",
-   "mm": 0.06,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_leds",
-   "b": "optical_head",
-   "kind": "contact",
-   "mm": 0.07,
-   "status": "PASS"
-  },
-  {
    "a": "mock_touch_window",
    "b": "shell_upper",
    "kind": "contact",
@@ -468,10 +370,10 @@
    "status": "PASS"
   },
   {
-   "a": "mock_camera",
+   "a": "mock_leds",
    "b": "optical_head",
    "kind": "contact",
-   "mm": 0.13,
+   "mm": 0.23,
    "status": "PASS"
   },
   {
@@ -503,38 +405,24 @@
    "status": "PASS"
   },
   {
+   "a": "mock_camera",
+   "b": "optical_head",
+   "kind": "clear",
+   "mm": 0.4,
+   "status": "PASS"
+  },
+  {
    "a": "mock_cartridge",
    "b": "optical_head",
    "kind": "contact",
-   "mm": 0.8,
+   "mm": 0.45,
    "status": "PASS"
   },
   {
-   "a": "sensor_carrier",
-   "b": "touch_collar",
+   "a": "optical_head",
+   "b": "slot_baffle",
    "kind": "clear",
    "mm": 1.0,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_camera",
-   "b": "mock_leds",
-   "kind": "clear",
-   "mm": 1.14,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_laser",
-   "b": "sensor_deck",
-   "kind": "clear",
-   "mm": 1.2,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_touch_leds",
-   "b": "sensor_carrier",
-   "kind": "clear",
-   "mm": 1.27,
    "status": "PASS"
   },
   {
@@ -545,31 +433,10 @@
    "status": "PASS"
   },
   {
-   "a": "optical_head",
-   "b": "slot_baffle",
+   "a": "mock_laser",
+   "b": "mock_leds",
    "kind": "clear",
-   "mm": 1.6,
-   "status": "PASS"
-  },
-  {
-   "a": "sensor_carrier",
-   "b": "sensor_deck",
-   "kind": "contact",
-   "mm": 1.6,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_as7341",
-   "b": "optical_head",
-   "kind": "clear",
-   "mm": 1.72,
-   "status": "PASS"
-  },
-  {
-   "a": "sensor_deck",
-   "b": "shell_upper",
-   "kind": "clear",
-   "mm": 1.9,
+   "mm": 1.51,
    "status": "PASS"
   },
   {
@@ -577,20 +444,6 @@
    "b": "optical_head",
    "kind": "clear",
    "mm": 2.04,
-   "status": "PASS"
-  },
-  {
-   "a": "aperture_tube",
-   "b": "mock_cartridge",
-   "kind": "clear",
-   "mm": 2.06,
-   "status": "PASS"
-  },
-  {
-   "a": "aperture_tube",
-   "b": "mock_leds",
-   "kind": "clear",
-   "mm": 2.14,
    "status": "PASS"
   },
   {
@@ -608,23 +461,9 @@
    "status": "PASS"
   },
   {
-   "a": "optical_head",
-   "b": "shell_upper",
-   "kind": "clear",
-   "mm": 2.25,
-   "status": "PASS"
-  },
-  {
    "a": "mock_as7341",
-   "b": "mock_laser",
-   "kind": "clear",
-   "mm": 2.27,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_as7341",
-   "b": "touch_collar",
-   "kind": "clear",
+   "b": "optical_head",
+   "kind": "contact",
    "mm": 2.4,
    "status": "PASS"
   },
@@ -633,20 +472,6 @@
    "b": "optical_head",
    "kind": "clear",
    "mm": 2.5,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_as7341",
-   "b": "mock_touch_leds",
-   "kind": "clear",
-   "mm": 2.67,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_laser",
-   "b": "sensor_carrier",
-   "kind": "clear",
-   "mm": 2.79,
    "status": "PASS"
   },
   {
@@ -664,24 +489,17 @@
    "status": "PASS"
   },
   {
+   "a": "mock_as7341",
+   "b": "shell_lower",
+   "kind": "clear",
+   "mm": 3.33,
+   "status": "PASS"
+  },
+  {
    "a": "mock_csi_ribbon",
    "b": "shell_upper",
    "kind": "clear",
    "mm": 3.62,
-   "status": "PASS"
-  },
-  {
-   "a": "optical_head",
-   "b": "sensor_carrier",
-   "kind": "clear",
-   "mm": 4.0,
-   "status": "PASS"
-  },
-  {
-   "a": "sensor_deck",
-   "b": "touch_collar",
-   "kind": "contact",
-   "mm": 4.0,
    "status": "PASS"
   },
   {
@@ -692,27 +510,6 @@
    "status": "PASS"
   },
   {
-   "a": "mock_touch_leds",
-   "b": "sensor_deck",
-   "kind": "clear",
-   "mm": 4.27,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_camera",
-   "b": "sensor_deck",
-   "kind": "clear",
-   "mm": 4.67,
-   "status": "PASS"
-  },
-  {
-   "a": "aperture_tube",
-   "b": "shell_lower",
-   "kind": "clear",
-   "mm": 5.0,
-   "status": "PASS"
-  },
-  {
    "a": "mock_camera",
    "b": "shell_lower",
    "kind": "clear",
@@ -720,45 +517,24 @@
    "status": "PASS"
   },
   {
-   "a": "mock_laser",
-   "b": "touch_collar",
+   "a": "optical_head",
+   "b": "shell_upper",
    "kind": "clear",
-   "mm": 5.37,
+   "mm": 5.32,
    "status": "PASS"
   },
   {
-   "a": "sensor_deck",
-   "b": "shell_lower",
-   "kind": "clear",
-   "mm": 6.0,
-   "status": "PASS"
-  },
-  {
-   "a": "shell_upper",
-   "b": "touch_collar",
-   "kind": "clear",
-   "mm": 6.0,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_laser",
+   "a": "mock_camera",
    "b": "mock_leds",
    "kind": "clear",
-   "mm": 6.05,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_touch_window",
-   "b": "touch_collar",
-   "kind": "clear",
-   "mm": 6.12,
+   "mm": 6.25,
    "status": "PASS"
   },
   {
    "a": "mock_cartridge",
    "b": "mock_leds",
    "kind": "clear",
-   "mm": 6.9,
+   "mm": 6.91,
    "status": "PASS"
   },
   {
@@ -769,17 +545,17 @@
    "status": "PASS"
   },
   {
-   "a": "aperture_tube",
-   "b": "mock_camera",
+   "a": "mock_as7341",
+   "b": "shell_upper",
    "kind": "clear",
-   "mm": 9.01,
+   "mm": 10.04,
    "status": "PASS"
   },
   {
-   "a": "mock_csi_ribbon",
-   "b": "mock_leds",
+   "a": "mock_leds",
+   "b": "shell_lower",
    "kind": "clear",
-   "mm": 11.5,
+   "mm": 13.61,
    "status": "PASS"
   },
   {
@@ -790,6 +566,13 @@
    "status": "PASS"
   },
   {
+   "a": "mock_csi_ribbon",
+   "b": "mock_leds",
+   "kind": "clear",
+   "mm": 15.88,
+   "status": "PASS"
+  },
+  {
    "a": "mock_laser",
    "b": "shell_lower",
    "kind": "clear",
@@ -797,38 +580,10 @@
    "status": "PASS"
   },
   {
-   "a": "mock_leds",
-   "b": "shell_lower",
-   "kind": "clear",
-   "mm": 17.17,
-   "status": "PASS"
-  },
-  {
-   "a": "sensor_carrier",
-   "b": "shell_upper",
-   "kind": "clear",
-   "mm": 17.26,
-   "status": "PASS"
-  },
-  {
    "a": "mock_laser",
    "b": "mock_touch_leds",
    "kind": "clear",
    "mm": 17.51,
-   "status": "PASS"
-  },
-  {
-   "a": "mock_as7341",
-   "b": "shell_upper",
-   "kind": "clear",
-   "mm": 19.0,
-   "status": "PASS"
-  },
-  {
-   "a": "aperture_tube",
-   "b": "mock_csi_ribbon",
-   "kind": "clear",
-   "mm": 19.78,
    "status": "PASS"
   },
   {
@@ -870,12 +625,12 @@
  "seats": [
   {
    "name": "led1-on-axis",
-   "detail": "emitter face at (+6.00, -26.40, 13.89), 12.000 mm from the read spot on its own axis",
+   "detail": "emitter face at (+1.18, -24.00, 13.89), 12.000 mm from the read spot on its own axis",
    "status": "PASS"
   },
   {
    "name": "led2-on-axis",
-   "detail": "emitter face at (-6.00, -38.40, 13.89), 12.000 mm from the read spot on its own axis",
+   "detail": "emitter face at (-1.18, -40.80, 13.89), 12.000 mm from the read spot on its own axis",
    "status": "PASS"
   },
   {
@@ -899,13 +654,13 @@
    "status": "PASS"
   },
   {
-   "name": "as7341-on-deck",
-   "detail": "board 35.80..37.40, on a deck top of Z=35.80; the die hangs to Z=34.80 in the shaft",
+   "name": "as7341-on-boss",
+   "detail": "face at (-25.46, -32.40, 20.10), 29.40 mm from the read spot on the spectro axis (az 180, 60 deg)",
    "status": "PASS"
   },
   {
-   "name": "as7341-long-axis-x",
-   "detail": "30.5 along X x 23.0 along Y -- the narrow side must face the laser exit at az 270",
+   "name": "as7341-long-axis-y",
+   "detail": "12.9 along X x 30.5 along Y",
    "status": "PASS"
   },
   {
@@ -976,56 +731,30 @@
   },
   {
    "id": 6,
-   "title": "6 - aperture tube",
+   "title": "7 - AS7341 on the spectro boss",
    "adds": [
-    "aperture_tube"
+    "mock_as7341"
    ],
    "glb": "step6.glb"
   },
   {
    "id": 7,
-   "title": "7 - sensor deck",
+   "title": "8 - cartridge in to stop 2",
    "adds": [
-    "sensor_deck"
+    "mock_cartridge"
    ],
    "glb": "step7.glb"
   },
   {
    "id": 8,
-   "title": "8 - AS7341 on the flip-mount",
-   "adds": [
-    "mock_as7341",
-    "sensor_carrier"
-   ],
-   "glb": "step8.glb"
-  },
-  {
-   "id": 9,
-   "title": "9 - touch collar + its LEDs",
-   "adds": [
-    "touch_collar",
-    "mock_touch_leds"
-   ],
-   "glb": "step9.glb"
-  },
-  {
-   "id": 10,
-   "title": "10 - cartridge in to stop 2",
-   "adds": [
-    "mock_cartridge"
-   ],
-   "glb": "step10.glb"
-  },
-  {
-   "id": 11,
-   "title": "11 - upper shell, OLED, windows",
+   "title": "9 - upper shell, OLED, windows",
    "adds": [
     "shell_upper",
     "mock_oled",
     "oled_bezel",
     "mock_touch_window"
    ],
-   "glb": "step11.glb"
+   "glb": "step8.glb"
   }
  ]
 }

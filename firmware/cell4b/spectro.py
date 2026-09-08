@@ -26,6 +26,8 @@ I2C_ADDR = 0x39
 # 415 nm first, because it is the channel the whole instrument exists to read.
 BANDS = (415, 445, 480, 515, 555, 590, 630, 680)
 
+ENABLE = 0x80          # bit 0 PON, bit 1 SP_EN
+
 # 16-bit ADC. Above this we call it saturated and refuse to trust the number.
 FULL_SCALE = 65535
 SATURATED = 0.95 * FULL_SCALE
@@ -110,7 +112,46 @@ class Spectrometer:
             atime = atime_for(EMITTER_OHMS, astep)
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.dev = AS7341(self.i2c, address=I2C_ADDR)
+        self.wake()
         self.set_timing(atime, astep, gain)
+
+    def wake(self) -> None:
+        """Force PON and SP_EN, rather than trusting the power-on state.
+
+        The Adafruit driver assumes it is talking to a freshly powered chip.
+        It is not always: after a brownout the AS7341 still ACKs at 0x39 and
+        every register reads back plausibly, but the ADC never converts and
+        all ten channels return a hard zero. That is indistinguishable from a
+        dark chamber, which is exactly the reading this device has to trust,
+        so it gets forced on every construction instead of being diagnosed
+        again. 0x80 is ENABLE: bit 0 PON, bit 1 SP_EN.
+        """
+        for value in (0x00, 0x01, 0x03):
+            self._poke(ENABLE, value)
+            time.sleep(0.01)
+        got = self._peek(ENABLE)
+        if got & 0x03 != 0x03:
+            raise RuntimeError(
+                f"AS7341 ENABLE reads 0x{got:02x} after being set to 0x03 -- "
+                "the chip answers on I2C but will not turn its ADC on")
+
+    def _poke(self, reg: int, value: int) -> None:
+        while not self.i2c.try_lock():
+            pass
+        try:
+            self.i2c.writeto(I2C_ADDR, bytes((reg, value)))
+        finally:
+            self.i2c.unlock()
+
+    def _peek(self, reg: int) -> int:
+        buf = bytearray(1)
+        while not self.i2c.try_lock():
+            pass
+        try:
+            self.i2c.writeto_then_readfrom(I2C_ADDR, bytes((reg,)), buf)
+        finally:
+            self.i2c.unlock()
+        return buf[0]
 
     def set_timing(self, atime: int, astep: int, gain: float) -> None:
         if gain not in GAIN_STEPS:

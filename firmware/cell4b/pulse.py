@@ -181,7 +181,14 @@ class Max3010x:
             self._write(m["led"], (step(red_ma) << 4) | step(ir_ma))
             self._write(m["mode"], 0x03)            # SpO2: red + IR
         else:
-            self._write(m["fifo_config"], 0b0100_1111)
+            # SMP_AVE=000 (no averaging), ROLLOVER=1, A_FULL=15.
+            #
+            # The previous 0b0100_1111 set SMP_AVE=4, which quarters the OUTPUT
+            # rate to 25 Hz while collect() kept reading at 100 -- so three
+            # reads in four returned a stale or empty slot and the trace swung
+            # from 981 to 151660 on a finger that had not moved. It also left
+            # rollover OFF, so the FIFO stopped dead once full.
+            self._write(m["fifo_config"], 0b0001_1111)
             self._write(m["spo2"], 0b0010_0111)
             self._write(m["led1"], min(255, int(red_ma / 0.2)))
             self._write(m["led2"], min(255, int(ir_ma / 0.2)))
@@ -201,19 +208,32 @@ class Max3010x:
             b = ((d[3] << 16) | (d[4] << 8) | d[5]) & 0x03FFFF
         return (b, a) if m["ir_first"] else (a, b)
 
+    def available(self) -> int:
+        """How many samples the FIFO actually holds, from its own pointers.
+
+        Reading blind at a fixed rate is what produced the 981..151660 trace:
+        ask faster than the part produces and you get whatever was last in the
+        slot. The pointers are the only honest answer to "is there new data".
+        """
+        wr = self._read(self.m["fifo_wr"], 1)[0] & 0x1F
+        rd = self._read(self.m["fifo_rd"], 1)[0] & 0x1F
+        return (wr - rd) % 32
+
     def collect(self, seconds: float = 10.0) -> tuple[list, list]:
-        """Block for `seconds`, returning (red, ir) sample lists."""
+        """Sample for `seconds`, taking only what the FIFO says is there."""
         red, ir = [], []
-        n = int(seconds * SAMPLE_RATE)
-        period = 1.0 / SAMPLE_RATE
-        t = time.monotonic()
-        for _ in range(n):
-            r, i = self.read_fifo()
-            red.append(r); ir.append(i)
-            t += period
-            dt = t - time.monotonic()
-            if dt > 0:
-                time.sleep(dt)
+        want = int(seconds * SAMPLE_RATE)
+        deadline = time.monotonic() + seconds * 2 + 2.0    # never hang forever
+        while len(ir) < want and time.monotonic() < deadline:
+            n = self.available()
+            if not n:
+                time.sleep(0.004)
+                continue
+            for _ in range(n):
+                r, i = self.read_fifo()
+                red.append(r); ir.append(i)
+                if len(ir) >= want:
+                    break
         return red, ir
 
 

@@ -82,8 +82,8 @@ Fit everything into the head **before** it goes into the shell, and before
 `sensor_deck` caps it. Once the deck is on, the LED bores are unreachable.
 
 1. **Three LEDs**, from outside, into the three 45° side bores:
-   - azimuth **45°** — white LED #1
-   - azimuth **225°** — white LED #2 (opposed, cancels droplet shading)
+   - azimuth **82°** — white LED #1
+   - azimuth **262°** — white LED #2 (opposed, cancels droplet shading)
    - azimuth **135°** — **940 nm IR**
    Push each until the dome bottoms at slant 12. Leads trail out behind.
 2. **Laser** into the 30° bore at azimuth **270°**. This is the one bore that
@@ -195,22 +195,119 @@ cannot be shared.
 
 ## 5. Wiring
 
-| Pin | Function |
-|---|---|
-| GPIO2/3 | I²C1 — AS7341 at 0x39 |
-| GPIO12 | white LED #1 — 2N7000, 68 Ω to **+5 V** |
-| GPIO16 | white LED #2 — 2N7000, 68 Ω to **+5 V** |
-| GPIO23 | 940 nm IR — 2N7000, **47 Ω to +3V3** |
-| GPIO6 | laser gate — 2N7000, interlocked through the microswitch |
-| GPIO22 | cartridge microswitch, internal pull-up, LOW when seated |
-| CSI | camera |
+The firmware is set to the **SINK** build (`hw.EMITTER_SINK = True`) — commit
+`d514af1`, so a build with no transistors works. This table is that build, with
+the **220 Ω** resistors actually fitted. **The flag must match your solder
+joints** — get it wrong and every emitter is lit exactly when it should be dark.
 
-GPIO16 is CELL-4B's addition — upstream drove white LED #1 from the AS7341's
-LDR pin, which no available breakout exposes (`FINDINGS.md` §2).
+| Pin | Function | Wiring |
+|---|---|---|
+| GPIO2/3 | I²C1 — AS7341 **0x39**, MAX30100 **0x57** | SDA / SCL, shared |
+| GPIO12 | white LED #1 | +5 V → **220 Ω** → LED → GPIO12 (**pin sinks; LOW = lit**) |
+| GPIO16 | white LED #2 | +5 V → **220 Ω** → LED → GPIO16 |
+| GPIO23 | 940 nm IR | **+3V3** → **220 Ω** → LED → GPIO23 |
+| GPIO6 | laser ENABLE | TTL enable on the module; module power straight off +5 V |
+| GPIO22 | cartridge switch | internal pull-up, LOW when seated |
+| CSI | camera | ribbon |
 
-**The two rails are different rails.** 68 Ω on +5 V gives a white LED ≈ 28 mA;
-the same resistor on +3V3 gives ≈ 3 mA and it barely lights. 47 Ω on +3V3 gives
-the 940 nm part ≈ 41 mA; on +5 V it passes ≈ 78 mA and cooks it.
+### The resistor is not a free choice — it is what makes a sink build legal
+
+In a sink build the **GPIO carries the LED current**, and a Pi pin is rated
+16 mA. The 68/47 Ω the optical design asks for assume a transistor in the
+ground return; put them on a pin directly and they blow straight past it:
+
+| | sink (as built) | with a 2N7000 |
+|---|---|---|
+| white, 68 Ω on +5 V | **27.9 mA — over the pin limit** | 25.3 mA |
+| white, **120 Ω on +5 V** | **15.8 mA** ✓ | 15.0 mA |
+| 940 nm, 47 Ω on +3V3 | **41.5 mA — over the pin limit** | 36.1 mA |
+| 940 nm, **120 Ω on +3V3** | **16.2 mA** — 0.2 over, see below | 15.4 mA |
+
+So the fitted resistor is load-bearing: **do not "correct" it back to 68/47
+while `EMITTER_SINK = True`.** Fitting the design resistors means fitting
+transistors in the same session, and setting the flag to `False`.
+
+**Integration is derived from the resistor, not hard-coded.** Set
+`spectro.EMITTER_OHMS` to what is actually soldered and `atime_for()` scales the
+timing with it — current goes as 1/R, so the sensor stays open in proportion:
+
+| fitted | ATIME | integration |
+|---|---|---|
+| 120 Ω | 99 | 500 ms |
+| 150 Ω | 124 | 626 ms |
+| **220 Ω** | **182** | **916 ms** |
+| 240 Ω | 199 | 1001 ms |
+
+The two must move together. 220 Ω timing on 120 Ω hardware over-integrates
+1.8× and saturates; the reverse under-reads. Above ~307 Ω the ATIME register
+runs out at 255 and ASTEP has to rise too.
+
+Halving the drive current and doubling the integration collects **the same
+photons**, so shot-noise-limited SNR is unchanged — what a bigger resistor costs
+is read *time*, and the part can integrate for 46.6 s. 916 ms is under 2 % of
+that. LEDs at 9 mA also run far cooler than at 28, which makes M2's
+"< 1 % RSD over 100 reads" easier to hit, not harder.
+
+**The IR must stay on +3V3 — for the pad, not the brightness.** A sink LED lets
+its GPIO float to (rail − V<sub>f</sub>) whenever the pin is an input, which it
+is during boot. A white on +5 V floats the pin to 1.90 V, fine. The 940 nm
+part's V<sub>f</sub> is only 1.35 V, so from +5 V it would float the pin to
+**3.65 V**, over the 3.3 V pad limit. Never move the IR to the 5 V rail here.
+
+### MAX30100 — the touch tier, on the same two I²C wires
+
+It is the **only** part the touch tier needs. It joins the bus the AS7341 is
+already on, and the addresses do not collide, so there is no mux:
+
+| MAX30100 pin | goes to | note |
+|---|---|---|
+| VIN | **3V3** | the breakout regulates down to the chip's 1.8 V itself |
+| GND | GND | |
+| SDA | **GPIO2** | same wire as the AS7341 |
+| SCL | **GPIO3** | same wire as the AS7341 |
+| INT | *not connected* | polling is enough at 50 Hz |
+| IRD / RD | *not connected* | LED drive is internal |
+
+Four wires. **Solder them flat to the pads — do not fit the pin header.** A
+header is 8–10 mm tall and `touch_post` leaves 23.0 mm between the head's flat
+top and the finger well, of which the board and chip already take 2.6. Route
+them down the 3.4 mm channel in the post's side.
+
+**If `i2cdetect` does not show `0x57`, check the pull-ups first.** The common
+GY-MAX30100 breakout ties its I²C pull-ups to the chip's internal **1.8 V**
+rail rather than to VIN, which is enough to stop a 3.3 V Pi seeing it at all.
+It is a well-known board fault with a well-known rework, and it looks exactly
+like a dead sensor. Check this before you suspect the part.
+
+Note also that this is now a **second** set of pull-ups on the bus, against the
+"only one 2.2 kΩ pair" rule below. Two pairs in parallel halve the effective
+resistance; the bus is short and slow enough here that it works, but if the
+AS7341 starts misbehaving after the MAX goes on, that is where to look.
+
+### A hand-held tactile switch on GPIO22 is a valid build
+
+The slot switch does not exist yet, and a tactile switch cannot replace the
+lever microswitch *in the slot* — its 0.25 mm travel is shorter than the
+channel's own fit clearance, it would be side-loaded, and its 6 mm body leaves
+~8.6 mm of the baffle notch open against a 1.2 mm daylight budget.
+
+But **held in the hand it is a legitimate enable**, and for everything up to M5
+it needs no changes at all: the wiring is identical, and `Button(pull_up=True)`
+reads a tactile to ground exactly as it reads a lever.
+
+For M6 it must be **HELD, not pressed once.** `laser()` used to check the switch
+only on entry, and `Speckle.series()` holds that block open for 600 s — so a
+momentary press bought a ten-minute exposure. The beam now **follows the switch
+for the whole block**: release it and the laser drops immediately, and the run
+raises rather than quietly returning dark frames.
+
+That makes a held button a deadman, which is a real safety device. A latched or
+taped-down one is not — it is `BENCH_NO_INTERLOCK` with extra steps.
+
+**The laser is not sunk.** It needs 20–40 mA, far past a pin's 16 mA, so it is
+never driven the way the LEDs are — it is a module with a TTL ENABLE input
+taking its current straight off +5 V. Its gate line is always active-high
+regardless of `EMITTER_SINK`.
 
 Only **one** 2.2 kΩ pull-up pair on the I²C bus. With a single breakout you
 keep the one it ships with — the classic first-build failure needs two boards

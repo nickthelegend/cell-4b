@@ -90,7 +90,37 @@ CAMERA_BORE = 6.0                            # lensless CSI clear aperture.
 # The AS7341 board's LONG axis runs along X (azimuth 0/180), so its narrowest
 # half-width (11.5 mm) faces azimuth 90/270 -- which is where the laser's top
 # exit lands. That orientation is load-bearing; see audit bore-exit checks.
-AZ_LED1, AZ_LED2, AZ_IR = 45.0, 225.0, 135.0
+# The white pair rotated +17 deg, staying OPPOSED (that is the property the
+# paired illumination depends on -- it cancels directional shadowing).
+#
+# [FINDING] At 45/225 the camera PCB and White LED A's body were 1.12 mm apart
+# -- legal against MIN_CLEAR 0.8, but a fit no one wants to make by hand with a
+# 5 mm LED and its leads. Their BORES also stayed merged out to s=10.9, past
+# CHAMBER_R, so the two shared an open cavity where there should have been wall.
+#
+# Rotating the pair trades that gap against led2~laser, which closes as the
+# pair swings toward the laser. Measured on the real bodies:
+#
+# [FINDING] Pure clearance peaks at 62, but 62 leaves the one thing that
+# actually matters: a STRAIGHT UNOBSTRUCTED LINE from white LED A's tip to the
+# camera die, passing 12 mm clear of the sample. It does not run down a bore --
+# it crosses the camera's DROP-IN POCKET, the open box (x 5.3..28.8,
+# z 6.8..29.5) that has to exist so the board can be lowered in. Light reaching
+# the speckle sensor without ever touching the sample is a false reading, not a
+# tolerance. Wall on that line, against what rotating the pair costs elsewhere:
+#
+#     led1    wall on the light path    led2~laser    cam~led1
+#      62            0.00  (CLEAR)         3.25         3.18
+#      70            0.27                  2.22         4.33
+#      78            1.51                  1.63         5.60
+#      82            2.08                  1.51         6.26
+#      90            3.31                  1.45         7.61
+#
+# 70 "blocks" it with 0.27 mm -- under MIN_WALL, one extrusion, and PLA that
+# thin is translucent. led2~laser flattens out around 1.45 past 82, so more
+# rotation buys wall almost free. 82 takes 2.08 mm of wall (2x MIN_WALL) for
+# 1.51 mm of clearance (nearly 2x MIN_CLEAR) -- both comfortably clear.
+AZ_LED1, AZ_LED2, AZ_IR = 82.0, 262.0, 135.0
 AZ_LASER = 270.0
 AZ_CAMERA = 0.0
 
@@ -175,6 +205,12 @@ CAM_PCB_L, CAM_PCB_W, CAM_PCB_T = 25.0, 24.0, 1.0
 CAM_HOLE_D = 2.2
 CAM_HOLE_DX, CAM_HOLE_DY = 21.0, 12.5        # VERIFY with calipers
 CAM_SENSOR = 8.5                             # bare sensor package, square
+# The package is SQUARE, and it stands 1.2 mm proud of the PCB toward the read
+# spot, so the head needs a square seat for it -- not just the round light
+# bore. Ø6 over-fills the 3.6 x 2.7 die and stays the optical aperture; this
+# recess is purely mechanical, so the bare die sits flush and square instead
+# of resting on the lip of a round hole.
+CAM_SENSOR_PROUD = 1.2
 CAM_FFC_W, CAM_FFC_T = 16.0, 0.3             # ribbon at the board
 
 # --- Waveshare AS7341 breakout ---------------------------------------------
@@ -208,6 +244,17 @@ LED_BODY_D = 5.0
 LED_BODY_L = 8.6
 # Subminiature SPDT snap-action with a lever, e.g. Omron D2F-01L class.
 # The 20 x 6.4 full-size part does not fit the 7.2 mm front strip. VERIFY.
+# Is there a switch IN THE SLOT? A hand-held tactile on GPIO22 is a valid
+# interlock (ASSEMBLY.md 5), but it is in your hand, not in the slot -- so the
+# baffle must not cut a hole for a body that will not be there.
+#
+# [FINDING] check_slot_light() counted mock_switch as a solid filling its own
+# notch, so the budget read 0.80 mm of 1.2 and passed. With no switch fitted
+# the same slot leaks 10.20 mm -- 8.5x the budget, straight at the read spot,
+# and M4 is "Clear < 0.5% at 10,000 lux". The check was green because of a part
+# that was not going to be installed.
+SLOT_SWITCH_FITTED = False
+
 SWITCH_L, SWITCH_W, SWITCH_H = 12.8, 6.0, 5.8
 SWITCH_LEVER = 5.0          # how far the lever reaches past the body
 SWITCH_FREE_TRAVEL = 1.2    # how far it protrudes into the channel when
@@ -276,6 +323,37 @@ HEAD_Z0 = Z_SAMPLE + HEAD_GAP           # 6.2
 # of wall) and opens the front gap to 7.2 mm.
 HEAD_DIA = 44.0
 HEAD_WALL = 2.4
+# optical_head() sweeps its profile in slabs this thick, and evaluates the
+# profile at each slab's MIDPOINT. bodies.head_pockets() therefore pads its
+# pockets by a further HEAD_DZ in Z: the last slab whose midpoint clears a
+# pocket's top ends BELOW that top, so the clearance is quantised away.
+# [FINDING] That cost the camera 0.16 mm of a 0.30 mm pad and left the board
+# a 0.13 mm interference fit in a pocket it has to drop into. The audit never
+# caught it because ("optical_head", "mock_camera") sat in CONTACT, where the
+# gap is reported but never asserted. See audit.DROP_IN.
+HEAD_DZ = 0.35
+
+# The head is a Ø44 barrel to the shoulder and an ellipsoidal DOME above it,
+# rather than a flat-topped cylinder. DOME_H is how much of the height the cap
+# takes; DOME_TOP_D is the flat left at the very top, which the laser still has
+# to exit through. Straight sides below the shoulder keep the LED and camera
+# bores leaving through a wall that is perpendicular to them.
+DOME_H = 12.0
+DOME_TOP_D = 18.0
+
+# --- TOUCH POST -------------------------------------------------------------
+# Carries a MAX30100 breakout from the head's flat top up to the finger well,
+# so the touch tier can be added WITHOUT reprinting the upper shell. The head
+# top and the ring port share an axis, so it stacks straight up.
+#
+# Board dims are for the common GY-MAX30100 breakout. MEASURE YOURS -- these
+# boards vary by vendor, and the pad is sized off these numbers.
+MAX30100_L, MAX30100_W, MAX30100_T = 20.0, 14.0, 1.2
+MAX30100_CHIP_H = 1.4        # optical face above the board's top surface
+TOUCH_POST_D = 11.0          # shaft; inside the Ø18 flat with wall to spare
+TOUCH_POST_BASE_D = 17.0     # foot on the head's flat top, for the glue
+TOUCH_POST_BASE_T = 2.0
+TOUCH_WIRE_W = 3.4           # channel down the side for four wires
 
 RS_X = 0.0                                        # read spot, X
 # TRAVEL and the two stops share ONE datum: the OUTER front face. At STOP2 the
@@ -296,6 +374,57 @@ R_CAMERA = CAMERA_OFFSET_R                                             # 8.00
 HEAD_BASE_Z1 = Z_SENSOR                 # = HEAD_TOP, the AS7341 deck
 DECK_T = 2.4                            # sensor deck thickness
 HEAD_TOP = Z_SAMPLE + SENSOR_STANDOFF   # 33.4, the sensor deck
+
+# --- SPECTRO PORT -----------------------------------------------------------
+# The AS7341 leaves the top deck for a boss on the head's FLANK. Upstream and
+# CELL-4B both sit it on the vertical axis -- but that axis is the one place the
+# camera also needs, and a 30.5 x 23 sensor board and a 25 x 24 camera board
+# cannot both have it. Taking the sensor off-axis is what frees it.
+#
+# AZIMUTH 180 is the only free quadrant. az 0 is the camera bore, az 45/135/225
+# the three LED bores, az 270 the laser; the LEDs' specular lobes leave at
+# az 45/225/315 and the laser's at az 90. Every other direction either has a
+# hole in it or a mirror image of a light source pointed down it -- and a sensor
+# sitting in a specular lobe reads glare off the PET window instead of diffuse
+# reflectance from the sample, which does not degrade the chemistry read, it
+# replaces it.
+#
+# 60 DEG, not 45. The face has to land OUTSIDE the Ø44 flank for the boss to be
+# ON the side rather than buried in the block, so the standoff is
+# (HEAD_DIA/2)/sin(tilt). 45 satisfied that -- face at r 22.0, z 30.2 -- but
+# the BOARD is 23 mm across and hangs perpendicular to the axis, so at 45 it
+# straddled the top edge: 6.1 mm of it, 35% of its height, stood above
+# HEAD_TOP. On the bench that still reads as "on top", which is the one thing
+# this port exists to stop. Tilt vs. where the board's top corner lands:
+#
+#     45 deg   6.1 mm above the head top     spot 4.24    31.4 deg off specular
+#     55 deg   0.0 mm, just grazing          spot 5.23    35.4
+#     60 deg   CLEAR by 2.5 mm               spot 6.00    38.1
+#     70 deg   CLEAR                         spot 8.77    44.6
+#
+# 60 is where the whole board drops below the head, and it is better on the
+# optics too: separation from the nearest specular lobe goes 31.4 -> 38.1 deg.
+# Past 65 the spot ellipse starts crowding the 10 mm window, so 60 it is.
+#
+# THE COSTS, all accepted: standoff 29.40 mm, so collected flux is 11.0x down
+# on upstream's 9 mm -- absorbed by integration time and divided out against
+# the white patch, exactly as the 9.7x before it was. The read spot goes
+# elliptical, 3.0 x 6.00 mm, still inside the 12 x 10 window blank. And the
+# TOUCH TIER goes: the flip that made one board read both a cartridge and a
+# fingertip needed that board on the vertical axis.
+AZ_SPECTRO = 180.0
+SPECTRO_ANGLE = 60.0
+# The axis leaves the Ø44 body at exactly (HEAD_DIA/2)/sin(tilt) = 31.11 mm, so
+# a pad there would sit ON the cylinder and the board would rock on a curve.
+# SPECTRO_PROUD stands the pad off along the axis until its face is clear of
+# the flank, and the boss behind it is the buttress that carries it.
+SPECTRO_PROUD = 4.0
+SPECTRO_STANDOFF = (HEAD_DIA / 2) / math.sin(math.radians(SPECTRO_ANGLE)) \
+    + SPECTRO_PROUD
+Z_SPECTRO = Z_SAMPLE + SPECTRO_STANDOFF * math.cos(math.radians(SPECTRO_ANGLE))
+R_SPECTRO = SPECTRO_STANDOFF * math.sin(math.radians(SPECTRO_ANGLE))
+SPECTRO_SPOT_MINOR = APERTURE_BORE
+SPECTRO_SPOT_MAJOR = APERTURE_BORE / math.cos(math.radians(SPECTRO_ANGLE))
 
 
 # --- TOUCH TIER -------------------------------------------------------------

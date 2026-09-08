@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 
-from shapely.geometry import box
+from shapely.geometry import LineString, box
 from shapely.ops import unary_union
 
 import bodies as BD
@@ -22,11 +22,59 @@ import spec as S
 # helpers
 # --------------------------------------------------------------------------
 
+def tilt_pad(tilt_deg):
+    """Extra bore DIAMETER a tilted bore needs to print to size.
+
+    [FINDING] optical_head() sweeps its profile in HEAD_DZ slabs and cuts each
+    one with the bore's ellipse AT THE SLAB MIDPOINT. A tilted bore's axis
+    moves sideways by (HEAD_DZ/2)*tan(tilt) between the midpoint and either
+    face of the slab, so the hole that actually gets cut is narrower than the
+    bore by that much on each side. At 45 deg that is 0.175 mm a side, which
+    turned the LEDs' nominal 0.2 mm slip fit into a measured 0.07 mm -- an
+    interference fit for a bought 5 mm LED. Same family as the camera pocket's
+    0.13 mm; see spec.HEAD_DZ.
+    """
+    return 2.0 * (S.HEAD_DZ / 2.0) * math.tan(math.radians(tilt_deg))
+
+
+def head_radius(z):
+    """The head's outer radius at height z: Ø44 to the shoulder, then the dome.
+
+    Module level rather than a closure inside optical_head() because the audit
+    has to test bore exits against the SAME curve the head is built from. When
+    it had its own copy of "R = HEAD_DIA/2" it went on reporting that the laser
+    left through a flat top face that the dome had already removed.
+    """
+    dome_z0 = S.HEAD_TOP - S.DOME_H
+    r_bot, r_top = S.HEAD_DIA / 2.0, S.DOME_TOP_D / 2.0
+    if z <= dome_z0:
+        return r_bot
+    t = min(1.0, (z - dome_z0) / S.DOME_H)
+    return math.sqrt(r_bot ** 2 - (r_bot ** 2 - r_top ** 2) * t * t)
+
+
+def square_section(side, tilt_deg, az_deg, x0, y0, z0, z):
+    """Horizontal cross-section of a SQUARE prism laid on a tilted axis.
+
+    The Bore class only makes round bores. The lensless camera's sensor is a
+    square package, so its seat has to be square too -- cut round, the die
+    would sit on the lip of a circle instead of flat in a pocket.
+    """
+    run = (z - z0) * math.tan(math.radians(tilt_deg))
+    cx = x0 + run * math.cos(math.radians(az_deg))
+    cy = y0 + run * math.sin(math.radians(az_deg))
+    major = side / math.cos(math.radians(tilt_deg))   # stretched along the lean
+    r = box(-major / 2.0, -side / 2.0, major / 2.0, side / 2.0)
+    r = pl.affinity.rotate(r, az_deg, origin=(0.0, 0.0))
+    return pl.affinity.translate(r, cx, cy)
+
+
 def _bores():
     """The five optical bores as partlib.Bore, axes through the read spot."""
     out = {}
     for name, d, tilt, az in S.OPTICAL_BORES:
-        out[name] = Bore(d, S.RS_X, S.RS_Y, S.Z_SAMPLE, tilt_deg=tilt, az_deg=az)
+        out[name] = Bore(d + tilt_pad(tilt), S.RS_X, S.RS_Y, S.Z_SAMPLE,
+                         tilt_deg=tilt, az_deg=az)
     return out
 
 
@@ -250,6 +298,19 @@ HEAD_LUG_R = 28.0
 HEAD_LUG_AZ = [115.0, 180.0, 305.0]
 LUG_PAD_D = 9.0
 Z_TUBE_TOP = S.Z_SAMPLE + 9.0         # top of the Ø3 x 6 aperture tube
+# The tube sits at the SAMPLE end of the spectro axis, measured ALONG it: the
+# barrel runs APT_S0..APT_S0+APERTURE_LEN, the flange the millimetre above it.
+#
+# 4.4, not the 2.0 a vertical axis allowed. Tilted 45 deg, the Ø6 barrel's
+# lowest point sits (APT_BARREL_D/2)*cos(45) = 2.12 mm BELOW its axis point, so
+# at s=2.0 the barrel's lower lip came through the head's underside and into
+# the cartridge. Clearing HEAD_Z0 needs s >= 4.13; 4.4 takes it with margin.
+APT_S0 = 4.4
+APT_S1 = APT_S0 + S.APERTURE_LEN
+
+# Wide enough to carry the AS7341's 25.5 x 18 hole pitch across its short axis
+# with wall to spare, and to buttress the pad back into the flank.
+SPECTRO_BOSS_D = 16.0
 
 
 def head_lugs_xy():
@@ -300,10 +361,33 @@ def optical_head():
         at r = 16.2, which clears the AS7341's 11.5 mm half-width at az 270
     """
     b = _bores()
-    disc = circle(S.HEAD_DIA, 120, S.RS_X, S.RS_Y)
-    tube_clear = circle(APT_BARREL_D + 2 * 0.2, 48, S.RS_X, S.RS_Y)
-    tube_cbore = circle(APT_FLANGE_D + 2 * 0.2, 64, S.RS_X, S.RS_Y)
-    shaft = circle(S.SHAFT_D, 48, S.RS_X, S.RS_Y)
+    dome_z0 = S.HEAD_TOP - S.DOME_H
+    r_bot, r_top = S.HEAD_DIA / 2, S.DOME_TOP_D / 2
+
+    def disc(z):
+        return circle(2.0 * head_radius(z), 120, S.RS_X, S.RS_Y)
+    # The sensor path is no longer vertical: it leaves along the spectro axis
+    # (az 180, 45 deg) so the AS7341 can mount on the FLANK instead of the top
+    # deck, which is what frees the vertical axis for the camera. Same stepped
+    # column as before -- tube bore, flange counterbore, relief shaft -- just
+    # stepped by distance ALONG THE AXIS rather than by height.
+    _sp = dict(tilt_deg=S.SPECTRO_ANGLE, az_deg=S.AZ_SPECTRO)
+    # The Ø3 x 6 aperture is now CUT INTO the head as a waist in the shaft,
+    # rather than being a separate tube dropped into a counterbore. Tilting the
+    # axis left no room for the tube: at s ~ 11 the spectro and LED axes are
+    # only 6.3 mm apart, and a Ø10 flange (r 5.0) against a Ø5 LED (r 2.5)
+    # wanted 8.3. Even a flangeless Ø6 barrel missed. A waist cut straight into
+    # the head is r 1.5 and clears with 2.3 mm to spare -- and it is still the
+    # limiting aperture, which is the only property that ever mattered.
+    aperture = Bore(S.APERTURE_BORE, S.RS_X, S.RS_Y, S.Z_SAMPLE, **_sp)
+    shaft = Bore(S.SHAFT_D + tilt_pad(S.SPECTRO_ANGLE),
+                 S.RS_X, S.RS_Y, S.Z_SAMPLE, **_sp)
+    # The pad the AS7341 sits on, and the buttress carrying it. Unioned along
+    # the same axis, so it cannot drift from the bore it surrounds. Inside the
+    # Ø44 body this adds nothing -- it only becomes material where the axis
+    # leaves the flank, which is exactly where the sensor needs a seat.
+    boss = Bore(SPECTRO_BOSS_D, S.RS_X, S.RS_Y, S.Z_SAMPLE, **_sp)
+    _cos = math.cos(math.radians(S.SPECTRO_ANGLE))
     # fastening lives OUTSIDE the body: pads added to the profile, clearance
     # holes through them. Nothing is cut through the optical volume any more.
     pads = _lug_pads()
@@ -312,33 +396,169 @@ def optical_head():
 
     pockets = BD.head_pockets()
 
+    # The pad face is the plane s = SPECTRO_STANDOFF, normal to the axis. At
+    # height z that plane cuts the XY plane in a line; everything at or below
+    # the pad is on one side of it. az 180 puts the axis along -X, so the test
+    # reduces to a bound on x.
+    # Pulled back one layer: layered() evaluates the profile at slab MIDPOINTS,
+    # so the last slab included can overshoot the pad plane by HEAD_DZ/cos(45)
+    # = 0.5 mm, and the board then lands on that overshoot instead of the pad.
+    # Back it off and the staircase tips sit at or under the plane, where glue
+    # can take up the rest.
+    _boss_s = S.SPECTRO_STANDOFF - S.HEAD_DZ / _cos
+    _diag = _boss_s / math.sin(math.radians(S.SPECTRO_ANGLE))
+
+    def _halfplane(z, s_lim):
+        """Everything at or below `s_lim` along the spectro axis, at height z."""
+        x_lim = S.RS_X + (z - S.Z_SAMPLE) \
+            - s_lim / math.sin(math.radians(S.SPECTRO_ANGLE))
+        return box(x_lim, S.RS_Y - 80.0, S.RS_X + 80.0, S.RS_Y + 80.0)
+
+    # The BODY has to stay off the sensor board; only the BOSS may touch it.
+    # Left alone the head's top-outer corner on the -X side reaches s = 35.35,
+    # past the board's plane at 35.11, and drove a 0.64 mm interference. This
+    # takes a shallow chamfer off that corner and nothing else.
+    _body_s = S.SPECTRO_STANDOFF - 0.8
+
     def profile(z):
-        g = disc.union(pads)
+        # The lug pads stop at the shoulder. Above it the body is narrowing, so
+        # a pad at r=28 webbed back to an anchor at r=20 would lose the wall it
+        # anchors INTO and print as a floating ring -- the exact failure
+        # _lug_pads() documents.
+        g = disc(z)
+        if z <= dome_z0:
+            g = g.union(pads)
+        g = g.intersection(_halfplane(z, _body_s))
+        s = (z - S.Z_SAMPLE) / _cos
+        if s <= _boss_s:
+            # Bore.section() is the cross-section of an INFINITE cylinder, and
+            # at 45 deg that ellipse is 1/cos(45) times as long as the bore is
+            # wide -- unioned raw it reached r=41.8 and came within 0.08 mm of
+            # the upper shell. Clip it to the half-plane s <= SPECTRO_STANDOFF,
+            # which is the plane of the pad face itself.
+            g = g.union(boss.section(z).intersection(_halfplane(z, _boss_s)))
         for n in names:
             g = g.difference(b[n].section(z))
+        # Square seat for the camera's bare sensor package, from its inner
+        # face outward. Beyond it the round CAMERA_BORE carries the light.
+        s_cam = (z - S.Z_SAMPLE) / math.cos(math.radians(S.CAMERA_ANGLE))
+        if s_cam >= S.CAMERA_SLANT - S.CAM_SENSOR_PROUD - S.FIT:
+            g = g.difference(square_section(
+                S.CAM_SENSOR + 2 * S.FIT + tilt_pad(S.CAMERA_ANGLE),
+                S.CAMERA_ANGLE, S.AZ_CAMERA,
+                S.RS_X, S.RS_Y, S.Z_SAMPLE, z))
         # drop-in pockets for the laser barrel and the camera board, both of
         # which are wider than the bore that carries their light. Derived from
         # bodies.py, so they cannot drift from the parts they clear.
         for prof, pz0, pz1 in pockets:
             if pz0 <= z <= pz1:
                 g = g.difference(prof)
-        # central column: tube bore, then its flange counterbore, then the
-        # relief shaft. The Ø3 x 6 tube stays the limiting aperture.
-        if z < Z_TUBE_TOP - APT_FLANGE_T:
-            g = g.difference(tube_clear)
-        elif z < Z_TUBE_TOP:
-            g = g.difference(tube_cbore)
+        # central column, stepped along the spectro axis: tube bore, its flange
+        # counterbore, then the relief shaft. The Ø3 x 6 tube is still the
+        # limiting aperture -- tilting it turns the read spot into a
+        # 3.0 x 4.24 ellipse, which the 12 x 10 window blank still contains.
+        if APT_S0 <= s < APT_S1:
+            g = g.difference(aperture.section(z))
         else:
-            g = g.difference(shaft)
+            g = g.difference(shaft.section(z))
         return g.difference(lug_holes)
 
     m = Mesh()
-    # skirt: closes the 0.8 mm gap over the cartridge everywhere except the
-    # corridor the cartridge itself sweeps.
-    skirt = disc.difference(circle(S.HEAD_DIA - 6.0, 120, S.RS_X, S.RS_Y)
-                            ).difference(_cart_channel(pad=0.15))
-    m += prism(skirt, HEAD_SKIRT_Z, S.HEAD_Z0)
-    m += layered(profile, S.HEAD_Z0, S.HEAD_TOP, dz=0.35)
+    # The base carries the head down to the floor and subsumes what used to be
+    # a 0.6 mm skirt over the cartridge -- same job, taken to the floor.
+    m += _head_base()
+    m += layered(profile, S.HEAD_Z0, S.HEAD_TOP, dz=S.HEAD_DZ)
+    return m
+
+
+def touch_post():
+    """Stands a MAX30100 on the head's flat top, facing the finger well.
+
+    The touch tier lost its flip-mount when the AS7341 moved to the flank, but
+    the upper shell still has the ring port, the finger well and the window
+    ledge. So the sensor does not need a new shell -- it needs to be held at
+    the right height under the port it already has, and the head's flat top is
+    directly below it on the same axis.
+
+    Height is set so the sensor's OPTICAL FACE lands at the window ledge:
+    everything above the post is board and chip, so the post itself is the
+    remainder. Trim the top if your breakout is thicker; a shim of card under
+    the board is the cheaper adjustment.
+
+    The wire channel exists because the pin header cannot be used -- 8-10 mm
+    of header does not fit under a ceiling 23.0 mm up with a 3 mm board on the
+    way. Solder flying leads to the pads instead and drop them down this slot.
+    """
+    z0 = S.HEAD_TOP
+    face = S.Z_SAMPLE + (S.ENV_Z - S.WALL - 1.0 - S.Z_SAMPLE)   # window ledge
+    top = face - S.MAX30100_T - S.MAX30100_CHIP_H
+    base = circle(S.TOUCH_POST_BASE_D, 64, S.RS_X, S.RS_Y)
+    shaft = circle(S.TOUCH_POST_D, 48, S.RS_X, S.RS_Y)
+    wire = box(S.RS_X - S.TOUCH_WIRE_W / 2, S.RS_Y - 40.0,
+               S.RS_X + S.TOUCH_WIRE_W / 2, S.RS_Y - S.TOUCH_POST_D / 2 + 1.2)
+    m = Mesh()
+    m += prism(base.difference(wire), z0, z0 + S.TOUCH_POST_BASE_T)
+    m += prism(shaft.difference(wire), z0 + S.TOUCH_POST_BASE_T - 0.02, top)
+    return m
+
+
+# --------------------------------------------------------------------------
+# head legs -- the head stands on the case instead of hanging off three screws
+# --------------------------------------------------------------------------
+
+LEG_OD = 13.0                       # leg diameter at the floor; the glue area
+LEG_CLEAR = 1.0                     # > audit MIN_CLEAR, with margin to spare
+
+
+def _head_base():
+    """Everything between the floor and the head's underside: the three legs,
+    and the fill between them that the cartridge does not sweep.
+
+    THE LEGS. The stock build hangs the head off one M2.5 per lug (deck ear ->
+    head lug -> shell boss), so a build with no hardware has nothing holding
+    it. These let it stand on the case floor and be glued there instead. Each
+    is bored to drop OVER the shell's existing boss, which locates the head off
+    the case rather than off a measurement and keeps the screw option intact --
+    the boss is still tapped and the lug's 2.8 hole still lands on top of it.
+
+    THE FILL. Legs alone would hold the 44 underside 3.8 mm off the bed with
+    nothing under 64% of it -- a 41.8 x 43.2 mm overhang over the very face
+    that clears the cartridge by HEAD_GAP, where support scars would rub. So
+    the space between the legs is filled wherever the cartridge does not sweep.
+    That is the old skirt's job (close the light gap over the cartridge) taken
+    to its conclusion, and it leaves one 14.6 mm span to bridge instead of a
+    43 mm one to support. It cannot foul the optics: every bore is within
+    r 3.8 of the axis by the time it reaches HEAD_Z0, so the channel cut has
+    already opened the whole light path to the sample.
+    """
+    disc = circle(S.HEAD_DIA, 120, S.RS_X, S.RS_Y).union(_lug_pads())
+    legs = unary_union([circle(LEG_OD, 48, x, y) for x, y in head_lugs_xy()])
+    prof = disc.union(legs).difference(_cart_channel(pad=0.15))
+    prof = prof.intersection(
+        box(-S.ENV_X / 2 + S.WALL + S.FIT, -S.ENV_Y / 2 + S.WALL + S.FIT,
+            S.ENV_X / 2 - S.WALL - S.FIT, S.ENV_Y / 2 - S.WALL - S.FIT))
+    prof = prof.difference(unary_union(
+        [circle(S.BOSS_OD + 2 * S.FIT, 32, x, y) for x, y in head_lugs_xy()]))
+
+    # The slot baffle crosses this. Notch it over the BAFFLE'S OWN z band --
+    # with clearance below it too, because the baffle is the slot's light seal
+    # and rests on the slot floor: pressing up on it opens the very leak it
+    # exists to close. The base closes back up above the notch, so it bridges
+    # rather than breaks and stays one solid.
+    baf = place("slot_baffle", slot_baffle())
+    blo, bhi = baf.bbox()
+    notch = BD.xy_envelope(baf, LEG_CLEAR)
+    nz0 = max(S.FLOOR, float(blo[2]) - LEG_CLEAR)
+    nz1 = min(S.HEAD_Z0, float(bhi[2]) + LEG_CLEAR)
+
+    m = Mesh()
+    for z0, z1, cut in ((S.FLOOR, nz0, False), (nz0, nz1, True),
+                        (nz1, S.HEAD_Z0, False)):
+        if z1 - z0 < 1e-6:
+            continue
+        g = prof.difference(notch) if cut else prof
+        if not g.is_empty:
+            m += prism(g, z0, z1)
     return m
 
 
@@ -383,9 +603,12 @@ def sensor_deck():
     # nothing the AS7341 touches has a screw head under it.
     plate = circle(S.HEAD_DIA, 160).union(_lug_pads(0.0, 0.0))
     shaft = circle(S.SHAFT_D, 48)
-    holes = unary_union([circle(S.M2_CLEAR, 24,
-                                sx * S.AS_HOLE_DX / 2, sy * S.AS_HOLE_DY / 2)
-                         for sx in (-1, 1) for sy in (-1, 1)])
+    # The AS7341's four M2 holes are gone -- the sensor moved to the flank
+    # boss. What the deck needs instead is a CUT where the board now passes
+    # through its plane on the way out to that boss. Derived from the body, so
+    # the slot cannot drift from the board it clears.
+    holes = pl.affinity.translate(
+        BD.xy_envelope(BD.as7341_body(), 0.8), -S.RS_X, -S.RS_Y)
     posts = _lug_holes(0.0, 0.0)
     # the laser is the one bore that exits the top face -- the deck must not
     # cap it. Its exit ellipse at HEAD_TOP, with clearance.
@@ -415,7 +638,10 @@ def slot_baffle():
     gap = box(-(S.CART_W + 2 * S.FIT) / 2, -2, (S.CART_W + 2 * S.FIT) / 2, 2)
     # notch for the cartridge switch. The switch body fills the notch, so the
     # baffle stays light-tight -- an open notch here would let the slot leak.
-    notch = MG.switch_footprint(0.9)      # > MIN_CLEAR, so it is a fit not a rub
+    # Only cut for the switch if one is actually going in the slot. Otherwise
+    # the notch is just a hole -- see spec.SLOT_SWITCH_FITTED.
+    notch = (MG.switch_footprint(0.9) if S.SLOT_SWITCH_FITTED
+             else box(0.0, 0.0, 0.0, 0.0))
     # ...and the same for any head-lug boss that crosses the baffle line. The
     # az-305 boss does. Same argument as the switch: the boss is solid and
     # fills the notch, so the slot stays light-tight.
@@ -704,16 +930,13 @@ PARTS = {
     "cartridge": (cartridge_sample, "#E9EDF2", 20),
     "cartridge_reference": (cartridge_reference, "#E9EDF2", 1),
     "cartridge_null": (cartridge_null, "#E9EDF2", 1),
-    "aperture_tube": (aperture_tube, "#2E3238", 1),
     "optical_head": (optical_head, "#2E3238", 1),
-    "sensor_deck": (sensor_deck, "#2E3238", 1),
-    "touch_collar": (touch_collar, "#3A4048", 1),
+    "touch_post": (touch_post, "#3A4048", 1),
     "slot_baffle": (slot_baffle, "#2E3238", 1),
     "window_jig": (window_jig, "#8A9099", 1),
     "shell_lower": (shell_lower, "#3A3F46", 1),
     "shell_upper": (shell_upper, "#3A3F46", 1),
     "oled_bezel": (oled_bezel, "#2E3238", 1),
-    "sensor_carrier": (sensor_carrier, "#2E3238", 1),
 }
 
 
@@ -733,15 +956,6 @@ DECK_T = 2.4
 
 def place(name, mesh):
     m = mesh.copy()
-    if name == "aperture_tube":
-        # modelled flange-down for printing; assembles flange-UP in the head's
-        # counterbore, barrel hanging into the bore below it.
-        m.rotate_x(180.0, about=(0.0, 0.0))
-        return m.translate(S.RS_X, S.RS_Y, Z_TUBE_FLANGE_TOP)
-    if name == "sensor_deck":
-        return m.translate(S.RS_X, S.RS_Y, S.HEAD_TOP)
-    if name == "sensor_carrier":
-        return m.translate(S.RS_X, S.RS_Y, S.HEAD_TOP + DECK_T + S.AS_PCB_T)
     if name == "oled_bezel":
         return m.translate(S.OLED_CX, S.OLED_CY, S.ENV_Z - BEZEL_T)
     if name == "slot_baffle":

@@ -96,20 +96,15 @@ def pi4b():
 # --------------------------------------------------------------------------
 
 def as7341():
-    """Breakout on the sensor deck, chip DOWN over the relief shaft.
-    Long axis along X -- that orientation is load-bearing, see audit."""
-    z = S.HEAD_TOP + P.DECK_T
-    m = Mesh()
-    board = pl.affinity.translate(
-        rounded_rect(S.AS_PCB_L, S.AS_PCB_W, 2.0), S.RS_X, S.RS_Y)
-    holes = unary_union([circle(S.AS_HOLE_D, 20,
-                                S.RS_X + sx * S.AS_HOLE_DX / 2,
-                                S.RS_Y + sy * S.AS_HOLE_DY / 2)
-                         for sx in (-1, 1) for sy in (-1, 1)])
-    m += prism(board.difference(holes), z, z + S.AS_PCB_T)
-    # the sensor package itself, looking down the shaft
-    m += prism(circle(3.0, 24, S.RS_X, S.RS_Y), z - 1.0, z)
-    return m
+    """Breakout on the SPECTRO BOSS, chip facing in down the relief shaft.
+
+    It used to lie flat on the sensor deck on the vertical axis. That axis is
+    the one the camera also needs, and a 30.5 x 23 sensor board and a 25 x 24
+    camera board cannot both have it -- which is the whole point of the flank
+    port. Geometry lives in bodies.as7341_body() so the deck can be cut to
+    clear it without parts importing mocks.
+    """
+    return BD.as7341_body()
 
 
 def camera():
@@ -288,6 +283,12 @@ MOCKS = {
     "mock_laser": (laser, "#B04A4A", 1.0),
     "mock_leds": (leds, "#E8E4D0", 1.0),
     "mock_oled": (oled, "#1A2A3A", 1.0),
-    "mock_switch": (switch, "#6B6B6B", 1.0),
     "mock_cartridge": (cartridge_in_place, "#EDF1F5", 1.0),
 }
+
+# A hand-held tactile on GPIO22 is a valid interlock (ASSEMBLY.md 5), but it is
+# in the hand, not in the slot -- so nothing occupies this volume. Registering
+# it anyway is what let check_slot_light() count a switch body as filling the
+# baffle notch, and report 0.80 mm of daylight where the real figure was 10.20.
+if S.SLOT_SWITCH_FITTED:
+    MOCKS["mock_switch"] = (switch, "#6B6B6B", 1.0)

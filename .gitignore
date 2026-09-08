@@ -1,12 +1,4 @@
-__pycache__/
-out/glb/
-video/out/raw/
-video/out/cuts/
-video/out/vo/
-videos/cell4b-assembly/renders/
-videos/cell4b-assembly/snapshots/
-videos/cell4b-assembly/assets/vo/
+.DS_Store
 __pycache__/
 *.pyc
-firmware/.venv/
-firmware/data/
+.venv/
