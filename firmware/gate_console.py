@@ -379,6 +379,35 @@ def chemistry(spec, bench):
 
 
 FRAME_FILE = "/tmp/cell-frame.txt"
+
+OLED = {"dev": None, "last": None}
+
+
+def oled(*rows):
+    """Write to the device's OWN screen.
+
+    The monitor is a convenience. This 128x64 panel is the display that ships
+    inside the instrument, and the airgap claim rests on the owner reading
+    what they are signing HERE -- on hardware with no network -- rather than
+    on a desktop that has one. A console that renders only to the desktop is
+    demonstrating the wrong thing.
+
+    Shares /dev/i2c-1 with the AS7341 and the MAX3010x, so it takes the same
+    lock, and only writes when the text actually changes: an OLED redrawn
+    every tick holds the bus against reads that matter more.
+    """
+    rows = tuple(str(r)[:21] for r in rows[:5])
+    if rows == OLED["last"]:
+        return
+    try:
+        with I2C_LOCK:
+            if OLED["dev"] is None:
+                from cell4b.display import Display
+                OLED["dev"] = Display()
+            OLED["dev"].lines(*rows)
+        OLED["last"] = rows
+    except Exception:
+        pass
 SCAN = {"qr": None, "parts": {}, "want": 0, "shown": False}
 
 
@@ -584,8 +613,10 @@ def sign_with_blood(spec, bench, seconds=300):
                          for g in gates] + ["", "NOTHING WAS SIGNED"]))
 
     # --- chemistry -------------------------------------------------------
+    oled("BLOOD GATE", "", "reading dark", "hold still", "")
     S["stage"] = "dark"; S["msg"] = "reading dark"
     S["dark"] = read3(spec, bench, "dark")
+    oled("BLOOD GATE", "", "white patch", "", "")
     S["stage"] = "white"; S["msg"] = "reading the white patch"
     S["white"] = read3(spec, bench, "white")
     ADVANCE.clear()
@@ -593,6 +624,7 @@ def sign_with_blood(spec, bench, seconds=300):
     S["msg"] = "push the cartridge to the SECOND stop, then press SPACE"
     SIGN.update(stage="BLOOD", ok=None,
                 lines=["advance the cartridge to the well", "then press SPACE"])
+    oled("BLOOD GATE", "", "advance to", "STOP 2", "then press SPACE")
     if not ADVANCE.wait(180):
         S["stage"] = "idle"
         return refuse("timed out waiting for the cartridge")
@@ -608,14 +640,20 @@ def sign_with_blood(spec, bench, seconds=300):
     if not all(g.passed for g in chem):
         S["stage"] = "chem done"
         S["msg"] = "chemistry refused -- nothing signed"
+        bad = next(g for g in chem if not g.passed)
+        oled("REFUSED", "", bad.name[:21], "", "nothing signed")
         return refuse("CHEMISTRY REFUSED THIS SAMPLE", chem)
 
     # --- speckle: flowing now, arrested later -----------------------------
+    oled("G1-G4 PASS", "", "watching it", f"clot {seconds}s", "do not touch")
     SIGN.update(stage="BLOOD", lines=["chemistry passed",
                                       f"watching it clot -- {seconds}s"])
     speckle(spec, bench, seconds)
     motion = [g for g in S["gates"] if g.name.startswith(("G5", "G6"))]
     if len(motion) < 2 or not all(g.passed for g in motion):
+        bad = next((g for g in motion if not g.passed), None)
+        oled("REFUSED", "", bad.name[:21] if bad else "no series",
+             "", "nothing signed")
         return refuse("MOTION GATES REFUSED THIS SAMPLE", S["gates"])
 
     # --- every gate passed. only now is there a key ----------------------
@@ -642,10 +680,15 @@ def sign_with_blood(spec, bench, seconds=300):
             max_fee_wei=t.max_fee_wei()).render()
         signer = eth.sign
 
+    for i in range(0, len(shown), 5):
+        oled(*shown[i:i + 5])
+        time.sleep(2.2)
     r, s_, y = signer(t, device_key())
     raw = "0x" + t.encode_signed(r, s_, y).hex()
     SCAN["qr"] = segno.make(raw, error="l")
     SCAN["shown"] = False
+    oled("SIGNED BY BLOOD", "", "all six gates", "passed",
+         t.txid(r, s_, y)[:18])
     try:
         with open("/tmp/cell-signed.txt", "w") as fh:
             fh.write(raw + "\n")
