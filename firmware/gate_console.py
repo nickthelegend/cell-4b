@@ -103,7 +103,9 @@ def read_colour_once():
     if SPEC_LOCK.acquire(blocking=False):
         try:
             b = ensure_bench()
-            b.white_1.on(); b.white_2.on()
+            b.white_1.on()
+            if b.white_2 is not None:
+                b.white_2.on()   # None when the violet holds its bore
             with I2C_LOCK:
                 r = SPEC.read()
             v = np.array([r.channels[x] for x in band_list()], dtype=float)
@@ -340,7 +342,9 @@ def read3(spec, bench, which):
     if which == "dark":
         bench.all_off()
     elif which == "white":
-        bench.white_1.on(); bench.white_2.on()
+        bench.white_1.on()
+        if bench.white_2 is not None:
+            bench.white_2.on()
     time.sleep(0.35)
     with I2C_LOCK:
         r = spec.read()
@@ -1003,7 +1007,9 @@ def tick():
     if LIGHTS["on"] and S["stage"] in IDLE:
         try:
             b = ensure_bench()
-            b.white_1.on(); b.white_2.on()
+            b.white_1.on()
+            if b.white_2 is not None:
+                b.white_2.on()   # None when the violet holds its bore
         except Exception as e:
             # Said once, not every 300 ms. Swallowing this silently turned a
             # hardware fault into "the camera pane is black", which is the
