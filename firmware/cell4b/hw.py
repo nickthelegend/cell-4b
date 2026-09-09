@@ -86,6 +86,21 @@ PIN_WHITE_2 = 16          # CELL-4B's addition; upstream drove this from the
                           # AS7341's LDR pin, which no breakout exposes.
 PIN_IR_940 = 23
 PIN_LASER = 6
+# A 400 nm violet emitter, for G3. The head has exactly three 45 deg / 12 mm
+# LED bores and all three are spoken for, so a fourth emitter cannot be added
+# without reprinting the optical head. Until then it displaces white #2 and
+# takes its bore and its pin -- chosen over the 940 nm because losing G2 costs
+# a gate that works, while losing half the white light only costs signal.
+#
+# The gates survive that: G1 and G3 are ratios of a sample against the printed
+# white patch AT THE SAME WAVELENGTH, from the same emitter, so illumination
+# geometry cancels in each ratio independently. That is what the patch is for.
+#
+# Set WHITE2_IS_VIOLET True once the swap is soldered. It is not a preference:
+# get it wrong and the code drives an LED that is not in that bore.
+WHITE2_IS_VIOLET = False
+PIN_VIOLET = PIN_WHITE_2      # same bore, same pin -- it replaces it
+
 PIN_CARTRIDGE = 22        # internal pull-up, LOW when a cartridge is seated
 
 
@@ -108,8 +123,16 @@ class Bench:
         hi = not EMITTER_SINK
         self.white_1 = DigitalOutputDevice(PIN_WHITE_1, active_high=hi,
                                            initial_value=False)
-        self.white_2 = DigitalOutputDevice(PIN_WHITE_2, active_high=hi,
-                                           initial_value=False)
+        # Exactly one of these owns the pin. gpiozero refuses two devices on
+        # one GPIO, and that refusal is the point: the bore holds one LED.
+        if WHITE2_IS_VIOLET:
+            self.white_2 = None
+            self.violet = DigitalOutputDevice(PIN_VIOLET, active_high=hi,
+                                              initial_value=False)
+        else:
+            self.white_2 = DigitalOutputDevice(PIN_WHITE_2, active_high=hi,
+                                               initial_value=False)
+            self.violet = None
         self.ir_940 = DigitalOutputDevice(PIN_IR_940, active_high=hi,
                                           initial_value=False)
         # The laser gate is always a real transistor, so always active-high.
@@ -131,7 +154,10 @@ class Bench:
 
     # -- emitters ---------------------------------------------------------
     def all_off(self) -> None:
-        for d in (self.white_1, self.white_2, self.ir_940, self._laser):
+        for d in (self.white_1, self.white_2, self.violet, self.ir_940,
+                  self._laser):
+            if d is None:
+                continue
             try:
                 d.off()
             except Exception:
@@ -139,15 +165,41 @@ class Bench:
 
     @contextmanager
     def white(self):
-        """Both white LEDs, for the duration of the block."""
+        """The white emitters, for the duration of the block.
+
+        One of them when the violet has taken white #2's bore. Half the light,
+        which costs signal and costs nothing else: every gate that uses this
+        is a ratio against the white patch under the same illumination.
+        """
         self.white_1.on()
-        self.white_2.on()
+        if self.white_2 is not None:
+            self.white_2.on()
         time.sleep(self.settle)
         try:
             yield
         finally:
             self.white_1.off()
-            self.white_2.off()
+            if self.white_2 is not None:
+                self.white_2.off()
+
+    @contextmanager
+    def ultraviolet(self):
+        """The 400 nm emitter, which is the only way G3 can be measured.
+
+        G3 is (R630 - R415)/(R630 + R415), and the white LEDs are blue-pump
+        phosphor: they emit nothing at 415, so F1 reads a hard zero and the
+        gate cannot run for any sample. See FINDINGS.md 12.
+        """
+        if self.violet is None:
+            raise RuntimeError(
+                "no violet emitter: set hw.WHITE2_IS_VIOLET True once the "
+                "400 nm LED is soldered into white #2's bore")
+        self.violet.on()
+        time.sleep(self.settle)
+        try:
+            yield
+        finally:
+            self.violet.off()
 
     @contextmanager
     def infrared(self):
@@ -225,8 +277,10 @@ class Bench:
 
     def close(self) -> None:
         self.all_off()
-        for d in (self.white_1, self.white_2, self.ir_940,
+        for d in (self.white_1, self.white_2, self.violet, self.ir_940,
                   self._laser, self.cartridge):
+            if d is None:
+                continue
             try:
                 d.close()
             except Exception:
