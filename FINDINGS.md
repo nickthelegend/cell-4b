@@ -366,6 +366,179 @@ boss. Both are filled by the part that sits in them, but neither is sealed.
 The chamber's real seal is the head skirt, checked separately. The budget is a
 regression bound, not a target.
 
+## 10. A 940 nm emitter cannot be sink-driven from +5V by a 3.3V GPIO
+
+**Severity: blocking, and it damages the pin.**
+
+Sink drive puts the GPIO on the cathode. The LED is therefore off only when
+the pin is driven to the rail voltage the anode sits at — and a 3.3V pin
+cannot reach +5V. What is left across the LED is the rail difference:
+
+```
+5.0 V (rail) − 3.3 V (pin driven high) = 1.7 V
+```
+
+A white LED has Vf ≈ 3.0 V, so 1.7 V cannot light it and sink drive from +5V
+is fine. A **940 nm** LED has **Vf ≈ 1.3 V**. 1.7 V is comfortably over it, so
+the IR emitter has **no off state at all**. Measured, holding the pin high:
+
+| pin state | AS7341 NIR |
+|---|---|
+| released (input) | 33 701 |
+| driven HIGH — nominally OFF | 27 939 |
+| driven LOW — ON | 34 506 |
+
+Released and ON are the same reading. Worse, a released pin is an *input*, so
++5V drives current through the LED into the pin's ESD clamp diode and out into
+the 3.3V rail. That is out-of-spec for the pad and back-feeds a rail from a
+diode never intended to carry it.
+
+This build lost **GPIO12** to what was almost certainly the same mechanism a
+day earlier: the pin stopped driving, `pinprobe` read it shorted to ground,
+and white #1 had to be moved to GPIO13.
+
+**The fix is one wire: the IR anode belongs on +3.3V.** Then a pin driven high
+puts 0 V across the LED, and a released pin cannot forward-bias anything.
+
+`hw.py`'s module docstring **already said this**, with the arithmetic:
+
+> the 940 nm on +3V3, because a sink LED floats its pin to (rail − Vf) while
+> the pin is an input, and 5 − 1.35 = 3.65 V is over the pad limit.
+
+It was rediscovered from measurements over about an hour. The header of
+`hw.py` is a wiring specification, not commentary.
+
+---
+
+## 11. EMITTER_OHMS is a calibration constant, and it disagreed with the build
+
+**Severity: silent 1.8× measurement error.**
+
+`spectro.atime_for()` scales integration time from the emitter resistor
+specifically to hold collected light constant as that resistor changes:
+
+```
+ATIME = round((99 + 1) · ohms / 120) − 1      →  120 Ω: 99    220 Ω: 182
+```
+
+`spectro.EMITTER_OHMS` said **220**. `hw.py`'s header said **120 ohm on all
+three emitters**. Both cannot be true, and the constant *is* the calibration.
+
+Every bench script written during bring-up copied `atime=99` out of the
+console. On 220 Ω hardware that under-integrates by **1.8×** — and it does not
+present as a wrong constant, it presents as a **dim instrument**. Hours were
+spent looking for a missing optical path that was partly just a missing
+factor of 1.8.
+
+The diagnostics now derive it (`atime_for(EMITTER_OHMS)`) rather than
+hardcoding either value, so changing the resistor changes one constant.
+
+---
+
+## 12. The white emitters cannot excite the Soret band. G3 cannot pass.
+
+**Severity: blocking for blood chemistry. Needs a part that is not in the BOM.**
+
+G3 is the haem gate, and it is the only one specific to a **porphyrin** rather
+than to "red and cell-like". It reads the Soret absorption at **415 nm**:
+
+```
+soret_index = (R630 − R415) / (R630 + R415)     must be ≥ 0.75
+```
+
+The white emitters are blue-pump phosphor LEDs. Their emission begins around
+445 nm; at 415 there is essentially nothing to reflect. Measured with both
+whites lit, 916 ms integration, three gains:
+
+| gain | 415 nm | 445 nm | 630 nm |
+|---|---|---|---|
+| 128× | **0** | 19 | 17 |
+| 256× | **0** | 39 | 33 |
+| 512× | **0** | 71 | 63 |
+
+Every doubling of gain doubles 445 and 630. **415 stays at exactly zero.** This
+is not a weak signal that more integration recovers — there is no signal.
+
+**G3 cannot pass, for any sample, on these emitters.** A ~405–415 nm violet LED
+is required. It is the highest-value missing part on the instrument: without
+it the device has no gate that distinguishes haem from any other red thing.
+
+---
+
+## 13. Demonstrated: a red marker is indistinguishable from blood, as built
+
+**Severity: this is the attack the device exists to reject.**
+
+Run blind, by the builder, without telling the operator what was in the well:
+the cartridge well was coloured with a **red marker pen** and presented as
+possibly blood.
+
+The instrument could not tell, and neither could the person reading it. The
+correct call ("not blood") was reached, but for a weak reason — the spectrum
+was not strongly red *either*, because the noise floor was 26× the signal, so
+everything reads washed out and neutral.
+
+| | net counts above dark |
+|---|---|
+| 415 | 5 |
+| 445 | 47 |
+| 480 | 33 |
+| 515 | 37 |
+| 555 | 51 |
+| 590 | 67 |
+| 630 | 58 |
+| 680 | 21 |
+
+Reproducible across two runs to within ~5 counts per band, so the shape is
+real — but a red marker on a white well should give 630/680 clearly dominant
+with blue crushed, and this gives 555 ≈ 630.
+
+The finding is not "the spectrometer is noisy". It is that **the specific gate
+designed to defeat this specific attack was the one that could not run.** G3
+exists because, in `blood_gate.py`'s own words, *"no common red substance —
+food dye, ketchup, beet juice, theatrical blood — has one."* With 415 nm dark,
+a dye and real blood produce the same verdict.
+
+A red-dye rejection claim is only as good as the 415 nm channel behind it, and
+that channel must be shown to have signal before the claim means anything.
+
+---
+
+## 14. Speckle contrast is below G5's sanity floor, and exposure does not fix it
+
+**Severity: blocking for G5/G6.**
+
+G5 checks that it is looking at speckle at all before it looks at motion:
+
+```python
+kbar = mean(K over the early window)
+if kbar < th.speckle_contrast_min:      # 0.10
+    return "No speckle — laser off, or nothing coherently scattering."
+```
+
+Measured with the laser on a static target, sweeping exposure over 66×:
+
+| exposure | K | | exposure | K |
+|---|---|---|---|---|
+| 500 µs | 0.0733 | | 8 000 µs | 0.0664 |
+| 1 000 µs | 0.0583 | | 16 000 µs | 0.0686 |
+| 2 000 µs | 0.0558 | | 33 000 µs | 0.0677 |
+| 4 000 µs | 0.0617 | | | |
+
+**Flat.** If temporal averaging were washing the speckle out, short exposures
+would win clearly; they do not. The grains are smaller than the sensor's
+pixels, which is geometry — grain size scales as roughly `λ·z / spot`, so it
+is set by the illuminated spot size and the 20 mm camera standoff, not by any
+camera setting.
+
+A clotting series measured on real blood ran `D 0.94 → 0.22` — endpoints that
+satisfy G6's `d_late ≤ 0.25` and `drop ≥ 0.35` — but **G5 would have refused it
+first on K**, and G6 also requires `rho ≤ −0.70`, a steady decline, which an
+oscillating series does not provide. Endpoints that look right are not the
+same as a gate passing.
+
+---
+
 ## Not changed
 
 For the avoidance of doubt, these are untouched from `BUILD.md` §8/§9:
