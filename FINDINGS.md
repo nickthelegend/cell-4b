@@ -587,6 +587,72 @@ mounted next to it is not bounded by any current rating on the pin.
 
 ---
 
+## 16. A red dye PASSES G2 and G3 when the white reference collapses
+
+**Severity: the gates report PASS, with confidence, on a measurement that
+does not exist. This is the failure `BOUNTY.md` asks claimants to post.**
+
+Measured, red dye in the well, this device, gain 256 / 916 ms:
+
+```
+dark         clear 5312
+white patch  clear 5140      <- the REFERENCE read darker than darkness
+sample       clear 5280
+
+[FAIL] G1 return signal    -32000000.0000   limit 0.0150
+[PASS] G2 cellular scatter  1e15            limit 2.2000   <- dye passed
+[PASS] G3 haem Soret band   1.0000          limit 0.7500   <- dye passed
+[FAIL] G4 spectral shape    0.0000          limit 0.9950
+```
+
+Not because the dye defeated the physics. Because `chemistry_gates()` forms
+its ratios without ever checking that the white reference exceeds the dark
+one. Once `white - dark <= 0`:
+
+* **G2** divides by approximately zero and returns 1e15, which clears 2.2.
+* **G3**'s index `(R630 - R415)/(R630 + R415)` goes to **1.0** as R415 goes to
+  zero, which clears 0.75. A dead 415 channel is arithmetically identical to
+  perfect Soret absorption.
+
+G3's docstring anticipates exactly this and then does not act on it:
+
+> Gate 1 has already established that the sample returns real signal, so the
+> ratio is meaningful here.
+
+That is an assumption recorded in a comment. `chemistry_gates()` evaluates all
+four independently and returns a list; **G3 never checks whether G1 ran, let
+alone passed.** The precondition its correctness depends on is documented and
+unenforced.
+
+### Why this is not just a broken-sensor story
+
+The whole device still refuses this sample, because G1 and G4 fail and every
+gate must pass. But a degraded white reference is not an exotic condition. A
+dirty patch, an aged emitter, a cartridge inserted to the wrong stop, or a
+sensor with elevated dark current (finding 15) all produce it. In each case
+two of the four chemistry gates stop discriminating and start agreeing with
+whatever they are shown.
+
+A gate that fails loudly is safe. A gate that passes on garbage is not, and
+these two pass in the direction that matters: **toward accepting a fake.**
+
+### The fix
+
+Refuse to evaluate rather than divide by a reference that is not there:
+
+```python
+if white_clear - dark_clear < MIN_REFERENCE:
+    return GateResult(name, False, 0.0, threshold,
+                      "white reference did not exceed dark -- nothing measured")
+```
+
+The gate set already has this instinct elsewhere: G5 checks speckle contrast
+before it looks at motion, precisely so "no speckle" cannot read as "no
+movement". G1-G4 need the same guard against "no reference" reading as
+"perfect sample".
+
+---
+
 ## Not changed
 
 For the avoidance of doubt, these are untouched from `BUILD.md` §8/§9:
