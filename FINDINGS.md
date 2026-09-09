@@ -539,6 +539,54 @@ same as a gate passing.
 
 ---
 
+## 15. Finding 10 has a second casualty: the sensor beside the emitter
+
+**Severity: destroyed an AS7341. Not recoverable.**
+
+Finding 10 records that a 940 nm emitter sink-driven from +5V has no off
+state, because the rail difference (5.0 - 3.3 = 1.7 V) exceeds its 1.3 V
+forward voltage. That was written up as a threat to the GPIO, and GPIO12 was
+lost to it.
+
+The GPIO was the cheap casualty. The emitter sits millimetres from the
+AS7341 in the same head, and it ran **continuously for hours** -- not
+because anything switched it on, but because nothing in software could
+switch it off.
+
+Measured afterwards, dark floor at gain 256 / 916 ms, chamber sealed, every
+emitter pin actively held off:
+
+| | clear | nir |
+|---|---|---|
+| before, at night | **0** | **0** |
+| after | **~6000** | **~38 000** |
+
+38 000 of 65 535 is **58% of full scale consumed by dark current** before any
+light arrives, worst on NIR -- the band an IR emitter would heat hardest.
+
+Two tests separate damage from temperature, and it fails both:
+
+* **Cold start.** Powered down, cooled, restarted: the floor was already
+  5045 at 112 s uptime and 44.8 C. Thermal dark current starts low and
+  climbs; this starts high.
+* **Direct cooling.** Ice against the sensor die: SoC 45.7 -> 41.8 C, floor
+  6263 -> 5965. **A 5% drop.** Dark current halves roughly every 8 C, so a
+  4 C fall should have taken ~30%. It is not temperature-driven any more.
+
+The instrument is otherwise working. Both whites light, the 400 nm violet
+gives a clean 415 nm channel with 6.5x selectivity and no housing
+fluorescence, the two-position read resolves the patch from the well, and
+G3 scored a red dye at 0.2233 against its 0.75 bar. All of it is unusable
+while the reference the gates divide by is 6000 counts of leakage: a white
+patch returning ~190 counts cannot be measured against a floor that drifts
+by 175 between readings.
+
+**The wiring lesson in finding 10 is not "check the pin rating".** It is that
+an emitter with no off state keeps emitting, and what it does to whatever is
+mounted next to it is not bounded by any current rating on the pin.
+
+---
+
 ## Not changed
 
 For the avoidance of doubt, these are untouched from `BUILD.md` §8/§9:
