@@ -98,7 +98,7 @@ PIN_LASER = 6
 #
 # Set WHITE2_IS_VIOLET True once the swap is soldered. It is not a preference:
 # get it wrong and the code drives an LED that is not in that bore.
-WHITE2_IS_VIOLET = False
+WHITE2_IS_VIOLET = True
 PIN_VIOLET = PIN_WHITE_2      # same bore, same pin -- it replaces it
 
 PIN_CARTRIDGE = 22        # internal pull-up, LOW when a cartridge is seated

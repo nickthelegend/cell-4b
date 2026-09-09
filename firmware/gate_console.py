@@ -384,6 +384,11 @@ def chemistry(spec, bench):
 
 FRAME_FILE = "/tmp/cell-frame.txt"
 
+# Counts the white patch must return ABOVE dark before any gate is
+# allowed to divide by it. Not a threshold on the sample -- a check
+# that a measurement happened at all.
+MIN_REFERENCE = 40.0
+
 OLED = {"dev": None, "last": None}
 
 
@@ -635,6 +640,25 @@ def sign_with_blood(spec, bench, seconds=300):
     S["stage"] = "sample"; S["msg"] = "reading the sample"
     S["chem"] = read3(spec, bench, "white")
     cap = {"dark": S["dark"], "white": S["white"], "chem": S["chem"]}
+
+    # FINDINGS 16. Every chemistry gate is a ratio against the white patch,
+    # and chemistry_gates() forms those ratios without checking the reference
+    # is real. Once white - dark <= 0, G2 divides by ~zero and returns 1e15,
+    # and G3's index goes to 1.0 as R415 goes to zero -- a dead 415 channel is
+    # arithmetically identical to perfect Soret absorption. Both then PASS.
+    #
+    # A red dye cleared both that way on this device. Refuse before the gates
+    # run rather than sign something authorised by arithmetic.
+    ref = S["white"][1] - S["dark"][1]
+    if ref < MIN_REFERENCE:
+        S["stage"] = "idle"
+        S["msg"] = "white reference too weak -- nothing signed"
+        return refuse(
+            f"NO USABLE WHITE REFERENCE  ({ref:+.0f} counts, need "
+            f"{MIN_REFERENCE})\n"
+            "  the patch did not return more light than darkness, so every\n"
+            "  gate below would be a ratio against nothing")
+
     try:
         chem = bg.chemistry_gates(cap, TH)
     except Exception as e:
