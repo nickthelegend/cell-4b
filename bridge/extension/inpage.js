@@ -60,6 +60,7 @@ function overlay(req, frames, digest, lines) {
         </div>
         <div class="cellbr-row">
           <button class="cellbr-btn" data-act="scan">Scan signature with camera</button>
+          <button class="cellbr-btn" data-act="copytx">Copy unsigned transaction</button>
         </div>
         <video class="cellbr-vid" data-act="video" playsinline muted hidden></video>
         <div class="cellbr-row">
@@ -106,6 +107,27 @@ function overlay(req, frames, digest, lines) {
     root.addEventListener("click", async (ev) => {
       const act = ev.target?.dataset?.act;
       if (act === "cancel") done({ cancelled: true });
+      if (act === "copytx") {
+        // The same frames the QR carries, as text. Reading them off the screen
+        // with a camera is the airgap; this is for when the camera cannot see
+        // it and the payload has to travel some other way. It is the UNSIGNED
+        // transaction -- public, no key near it -- and the device still
+        // rebuilds and re-renders it before signing, so pasting it in skips
+        // the transport and nothing else.
+        try {
+          await navigator.clipboard.writeText(frames.join("\n"));
+          ev.target.textContent = "Copied \u2713";
+        } catch (e) {
+          const ta = document.createElement("textarea");
+          ta.value = frames.join("\n");
+          document.body.appendChild(ta);
+          ta.select();
+          ev.target.textContent = document.execCommand("copy")
+            ? "Copied \u2713" : "Copy failed";
+          ta.remove();
+        }
+        setTimeout(() => { ev.target.textContent = "Copy unsigned transaction"; }, 1600);
+      }
       if (act === "mock") {
         ev.target.disabled = true;
         say("waiting for the gate…");
