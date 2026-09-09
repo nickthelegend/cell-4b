@@ -7,10 +7,17 @@ nothing in software should assume that. So every laser call re-reads the switch
 and refuses on its own account. Two independent refusals, one of which you can
 test without a multimeter.
 
-Pinout is ASSEMBLY.md section 5. This build fits 120 ohm on all three emitters,
+Pinout is ASSEMBLY.md section 5. This build fits 220 ohm on all three emitters,
 NOT the 68/47 the optical design asks for: those assume a transistor in the
 ground return, and with EMITTER_SINK the pin itself carries the current against
 a 16 mA rating -- 68 ohm is 27.9 mA and 47 ohm is 41.5 mA.
+
+That value is not free-floating: spectro.EMITTER_OHMS must agree with it,
+because atime_for() scales integration time from it to hold collected light
+constant. This line said 120 while EMITTER_OHMS said 220, and a day of bench
+scripts copied the 120 timing -- every reading collected 1.8x less light than
+the hardware could deliver, which reads as a dim instrument rather than as a
+wrong constant.
 
 The rails are still NOT interchangeable. Whites on +5V (Vf ~3.1 V, so +3V3
 barely lights them); the 940 nm on +3V3, because a sink LED floats its pin to

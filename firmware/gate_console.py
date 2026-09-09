@@ -1080,9 +1080,9 @@ def ensure_bench():
     with BENCH_LOCK:
         if BENCH is None:
             from cell4b.hw import Bench
-            from cell4b.spectro import Spectrometer
+            from cell4b.spectro import atime_for, EMITTER_OHMS, Spectrometer
             BENCH = Bench()
-            SPEC = Spectrometer(atime=99, astep=1799, gain=256)
+            SPEC = Spectrometer(atime=atime_for(EMITTER_OHMS), astep=1799, gain=256)
     return BENCH
 
 
