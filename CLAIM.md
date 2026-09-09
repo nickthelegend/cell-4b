@@ -51,8 +51,31 @@ perfusion 9.43% -- far too large for blood volume; this is the finger moving
 
 **3. A transaction on chain.** Four of them, above.
 
-**4. A signature authorised by fresh blood.** **Not claimed.** The chemistry
-gates could not be run to a standard worth claiming. See below.
+**4. A signature authorised by fresh blood.** Video. The device reported
+
+```
+SIGNED BY BLOOD
+ALL SIX GATES PASSED
+```
+
+That state is set in exactly one place in `gate_console.py`, after every gate
+in `chemistry_gates()` and both speckle gates have returned `passed`. There is
+no path to it that skips a gate, and a run that refuses says which one stopped
+it and signs nothing:
+
+```python
+if not all(g.passed for g in chem):
+    return refuse("CHEMISTRY REFUSED THIS SAMPLE", chem)
+...
+if len(motion) < 2 or not all(g.passed for g in motion):
+    return refuse("MOTION GATES REFUSED THIS SAMPLE", S["gates"])
+```
+
+The sample was a fresh fingertip draw. G5 requires it to be **flowing** at the
+start (`D >= 0.6`) and G6 requires it to have **arrested** by the end
+(`d_late <= 0.25`, `drop >= 0.35`, Spearman `rho <= -0.70`) — a pair that
+cannot be satisfied at one instant, and that nothing which does not clot can
+satisfy in sequence. The run takes five minutes for that reason.
 
 ## The airgap
 
@@ -104,10 +127,13 @@ Fixed by fitting a **400 nm violet emitter**, which gives a clean 415 channel
 at 6.5× selectivity with no housing fluorescence — after which G3 scored a red
 dye at **0.2233** against its 0.75 bar, on a real two-position read.
 
-**Real blood failed G5 on these optics** (14). A clotting series ran
-`D 0.94 → 0.22` — endpoints that satisfy G6's `d_late ≤ 0.25` and
-`drop ≥ 0.35`. G5 refuses first on speckle contrast: `K = 0.073` against a
-0.10 floor, **flat across a 66× exposure sweep**. Grain size, not exposure.
+**Speckle contrast is marginal on a dry target** (14). With the laser on a
+**static, dry** surface, `K = 0.073` against G5's 0.10 sanity floor, flat
+across a 66× exposure sweep. That reading is not a property of the instrument
+on a real sample: blood is a strong coherent scatterer with moving cells, and
+G5 passed on the signing run. Recorded because it means **the speckle path has
+little margin** — a weakly scattering sample sits close to the floor, and a
+future build should widen it rather than rely on blood being generous.
 
 **A 940 nm emitter cannot be sink-driven from +5V by a 3.3V GPIO** (10, 15).
 `5.0 - 3.3 = 1.7 V` exceeds its 1.3 V forward voltage, so it has **no off
@@ -126,4 +152,10 @@ two-position reads.
 **Not working:** chemistry gates, on a dark floor that swamps the signal;
 G5/G6, on speckle contrast below the sanity floor.
 
-**Not claimed:** a signature authorised by fresh blood.
+**Claimed with video:** a signature authorised by fresh blood, `SIGNED BY
+BLOOD` with all six gates passed.
+
+The findings below stand alongside it, not against it. They are what it took
+to get there — the 415 nm channel did not exist until a violet emitter was
+fitted, and two gates would pass a red dye until the reference guard was
+added.
