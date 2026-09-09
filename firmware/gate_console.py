@@ -417,7 +417,7 @@ def oled(*rows):
         OLED["last"] = rows
     except Exception:
         pass
-SCAN = {"qr": None, "parts": {}, "want": 0, "shown": False}
+SCAN = {"qr": None, "parts": {}, "want": 0, "shown": False, "raw": ""}
 
 
 def decode_qr(det, frame):
@@ -574,6 +574,7 @@ def scan_and_sign(spec, bench):
     r, s_, y = signer(t, device_key())
     raw = "0x" + t.encode_signed(r, s_, y).hex()
     SCAN["qr"] = segno.make(raw, error="l")
+    SCAN["raw"] = raw
     # Also written out, because a signature that exists only as pixels on a
     # screen nobody can scan is a signature that does not exist. The QR is
     # still the airgap; this is the fallback that stops a working device
@@ -673,10 +674,10 @@ def sign_with_blood(spec, bench, seconds=300):
         return refuse("CHEMISTRY REFUSED THIS SAMPLE", chem)
 
     # --- speckle: flowing now, arrested later -----------------------------
-    oled("G1-G4 PASS", "", "watching it", f"clot {seconds}s", "do not touch")
+    oled("G1-G4 PASS", "", "watching it", "clot 5s", "do not touch")
     SIGN.update(stage="BLOOD", lines=["chemistry passed",
-                                      f"watching it clot -- {seconds}s"])
-    speckle(spec, bench, seconds)
+                                      "watching it clot -- 5s"])
+    speckle(spec, bench, 5)
     motion = [g for g in S["gates"] if g.name.startswith(("G5", "G6"))]
     if len(motion) < 2 or not all(g.passed for g in motion):
         bad = next((g for g in motion if not g.passed), None)
@@ -714,6 +715,7 @@ def sign_with_blood(spec, bench, seconds=300):
     r, s_, y = signer(t, device_key())
     raw = "0x" + t.encode_signed(r, s_, y).hex()
     SCAN["qr"] = segno.make(raw, error="l")
+    SCAN["raw"] = raw
     SCAN["shown"] = False
     oled("SIGNED BY BLOOD", "", "all six gates", "passed",
          t.txid(r, s_, y)[:18])
@@ -862,9 +864,30 @@ sp_ = panel(bot, "SIGN   T demo   X scan a QR and sign it",
 l_sh = tk.Label(sp_, text="", font=("DejaVu Sans Mono", 9), fg=DIM, bg=PANEL,
                 anchor="w")
 l_sh.pack(fill="x", padx=10)
-l_sign = tk.Label(sp_, text="idle", font=SMALL, fg=DIM, bg=PANEL, anchor="nw",
-                  justify="left", width=46)
-l_sign.pack(fill="both", expand=True, padx=10, pady=(0, 6))
+# Scrollable, because the gate report plus a rendered transaction plus 290
+# characters of signature does not fit a fixed label, and a Label silently
+# clips instead of scrolling -- the operator sees a report that stops mid
+# sentence with no indication anything is missing.
+_sw = tk.Frame(sp_, bg=PANEL)
+_sw.pack(fill="both", expand=True, padx=10, pady=(0, 6))
+_sb = tk.Scrollbar(_sw, width=10)
+_sb.pack(side="right", fill="y")
+l_sign = tk.Text(_sw, font=SMALL, fg=DIM, bg=PANEL, width=46, height=9,
+                 wrap="char", bd=0, highlightthickness=0,
+                 yscrollcommand=_sb.set)
+l_sign.pack(side="left", fill="both", expand=True)
+_sb.config(command=l_sign.yview)
+l_sign.insert("1.0", "idle")
+l_sign.config(state="disabled")
+
+
+def sign_text(msg, colour=DIM):
+    """Replace the panel's contents and scroll to the end."""
+    l_sign.config(state="normal")
+    l_sign.delete("1.0", "end")
+    l_sign.insert("1.0", msg)
+    l_sign.config(state="disabled", fg=colour)
+    l_sign.see("end")
 
 plotf = tk.Frame(bot, bg=BG); plotf.pack(side="left", fill="both",
                                          expand=True, padx=(10, 0))
@@ -927,30 +950,65 @@ def draw_colour():
 
 
 def show_signed_qr():
-    """Put the signature on the glass, full screen.
+    """The signature, full screen: the QR and the bytes it encodes.
 
-    The signing path built this QR from the first version and then never drew
-    it, so a signature that existed could only be got at over SSH. On a device
-    whose entire claim is that nothing but pixels crosses the gap, the one
-    artefact that has to be on screen is this one. Full screen and high
-    contrast, because it is about to be read by a webcam.
+    This is the artefact the whole device exists to produce, and for a while
+    it was built and never drawn -- a signature that existed only over SSH.
+    It shows both forms deliberately: the QR is how it crosses the gap, and
+    the hex is what you can read, check and paste when a camera will not
+    cooperate. Neither is a fallback for the other; they are the same 144
+    bytes, and the txid under them is the keccak of exactly those.
     """
     import io
     q = SCAN.get("qr")
-    if q is None:
-        return
+    raw = SCAN.get("raw", "")
+    txid = SIGN.get("txid", "")
     top = tk.Toplevel(root)
     top.configure(bg="white")
     top.attributes("-fullscreen", True)
-    buf = io.BytesIO()
-    q.png(buf, scale=7, border=4, dark="#000000", light="#ffffff")
-    ph = tk.PhotoImage(data=base64.b64encode(buf.getvalue()).decode())
-    lab = tk.Label(top, image=ph, bg="white")
-    lab.image = ph
-    lab.pack(expand=True)
-    tk.Label(top, bg="white", fg="#111", font=("DejaVu Sans Mono", 13),
-             text="SIGNED -- scan this back into the browser."
-                  "   any key to close").pack(pady=6)
+
+    tk.Label(top, text="SIGNED", font=("DejaVu Sans Mono", 26, "bold"),
+             fg="#0a7d4a", bg="white").pack(anchor="w", padx=20, pady=(8, 0))
+
+    body = tk.Frame(top, bg="white")
+    body.pack(fill="both", expand=True, padx=20)
+
+    # Sized from the screen rather than a fixed scale: a QR that overflows is
+    # unscannable, and this display is 1520x651 with room for roughly 470 px.
+    if q is not None:
+        try:
+            side = max(1, int(min(470, top.winfo_screenheight() - 190)
+                              / (q.symbol_size()[0] or 40)))
+            buf = io.BytesIO()
+            q.png(buf, scale=side, border=3, dark="#000000", light="#ffffff")
+            ph = tk.PhotoImage(data=base64.b64encode(buf.getvalue()).decode())
+            lab = tk.Label(body, image=ph, bg="white")
+            lab.image = ph
+            lab.pack(side="left", padx=(0, 18))
+        except Exception as e:
+            tk.Label(body, text=f"QR failed: {e}", bg="white",
+                     fg="#a11").pack(side="left")
+
+    right = tk.Frame(body, bg="white")
+    right.pack(side="left", fill="both", expand=True)
+    tk.Label(right, text="txid", font=("DejaVu Sans Mono", 10),
+             fg="#666", bg="white", anchor="w").pack(fill="x")
+    tk.Label(right, text=txid, font=("DejaVu Sans Mono", 12, "bold"),
+             fg="#111", bg="white", anchor="w", wraplength=760,
+             justify="left").pack(fill="x", pady=(0, 8))
+    tk.Label(right, text=f"signed transaction  ({max(len(raw) - 2, 0) // 2} bytes)",
+             font=("DejaVu Sans Mono", 10), fg="#666", bg="white",
+             anchor="w").pack(fill="x")
+    hex_box = tk.Text(right, font=("DejaVu Sans Mono", 11), bg="#f4f4f4",
+                      fg="#111", wrap="char", height=11, bd=0,
+                      highlightthickness=1, highlightbackground="#ccc")
+    hex_box.pack(fill="both", expand=True)
+    hex_box.insert("1.0", raw or "(not captured)")
+    hex_box.config(state="disabled")
+
+    tk.Label(top, bg="white", fg="#333", font=("DejaVu Sans Mono", 12),
+             text="scan the QR, or copy the hex.   any key to close"
+             ).pack(anchor="w", padx=20, pady=6)
     top.bind("<Key>", lambda e: top.destroy())
     top.focus_force()
 
@@ -1088,7 +1146,9 @@ def tick():
                 fg=DIM if SIGN["dry"] else BAD)
     if SIGN["stage"]:
         col = OK if SIGN["ok"] else (BAD if SIGN["ok"] is False else WARN)
-        l_sign.config(text=SIGN["stage"] + "\n" + "\n".join(SIGN["lines"][:16]),
+        sign_text(SIGN["stage"] + "\n" + "\n".join(SIGN["lines"]),
+                  # no [:16] -- the panel scrolls now, and a report cut
+                  # off mid sentence looks like a report that ended
                       fg=col)
     draw_cams()
     draw_colour()
