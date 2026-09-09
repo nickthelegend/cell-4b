@@ -49,11 +49,26 @@ Screenshots: `XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 grim
 | cartridge switch | 22 | 15 | **never reads seated** — untrusted |
 | ~~GPIO12~~ | 12 | 32 | **DEAD.** Killed by the 5V clamp, see trap 1 |
 
-**AS7341 (0x39): damaged.** Dark floor wanders between 826 and 5300 counts at
-gain 256 / 916 ms, against a signal of ~200. It fails both tests that would
-excuse it: a cold start shows the floor already high, and ice directly on the
-die moved it 5% for a 4 C fall where dark current halves every ~8 C.
-**Chemistry gates cannot be trusted until this part is replaced.** FINDINGS 15.
+**AS7341 (0x39): high dark floor, cause not established.** It wanders between
+826 and 5300 counts at gain 256 / 916 ms against a signal of ~200, and every
+chemistry gate is a ratio against it. **That is the blocker.**
+
+What is NOT established is why. Two candidates, and the evidence is mixed:
+
+* **Ambient temperature.** Dark current roughly doubles every 8 C, and the
+  floor was **0** at 2 a.m. and thousands by afternoon on the same hardware.
+  That is a strong argument on its own.
+* **Damage.** The 940 nm emitter sat lit against the die for hours before the
+  rail error was found (trap 1), and NIR is the worst-affected channel.
+
+An ice test appeared to rule out temperature, but it measured
+`vcgencmd measure_temp` -- **the SoC, not the sensor** -- so it proved nothing
+about the die. Do not repeat that mistake.
+
+**To settle it:** measure the floor cold and hot with a thermometer ON THE
+SENSOR, or simply take a reading after dark and compare against the same
+reading at midday. If it tracks ambient, work cool; if it does not, replace
+the part. FINDINGS 15 records the measurements, not a verdict.
 
 **MAX3010x (0x57) and the OLED (0x3c) are fine.** The pulse gate works and has
 authorised a real mainnet signature.
@@ -172,7 +187,9 @@ fluorescence); two-position reads when the sensor holds still.
 
 **Blocked:**
 
-- **Chemistry gates** — the AS7341's floor. Replace the part.
+- **Chemistry gates** — the AS7341's dark floor swamps the signal. Establish
+  whether it tracks ambient temperature before assuming the part is at fault;
+  it read 0 at 2 a.m. on this hardware.
 - **G5/G6** — speckle contrast `K = 0.073` against a 0.10 floor, flat across a
   66x exposure sweep. Grain size, not exposure. FINDINGS 14.
 - **G3** — needs the violet, which is now fitted. Measured a red dye at

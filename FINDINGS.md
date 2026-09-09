@@ -541,7 +541,8 @@ same as a gate passing.
 
 ## 15. Finding 10 has a second casualty: the sensor beside the emitter
 
-**Severity: destroyed an AS7341. Not recoverable.**
+**Severity: blocks all chemistry. Cause not established -- see the
+correction at the end of this section.**
 
 Finding 10 records that a 940 nm emitter sink-driven from +5V has no off
 state, because the rail difference (5.0 - 3.3 = 1.7 V) exceeds its 1.3 V
@@ -584,6 +585,21 @@ by 175 between readings.
 **The wiring lesson in finding 10 is not "check the pin rating".** It is that
 an emitter with no off state keeps emitting, and what it does to whatever is
 mounted next to it is not bounded by any current rating on the pin.
+
+### Correction
+
+The direct-cooling test above is not sound, and this finding should not be
+read as proving damage. It reports `vcgencmd measure_temp`, which is the
+**SoC** temperature -- the AS7341 sits on the optical head, remote from it.
+The die's own temperature was never measured, so "4 C fall for a 5% drop"
+compares a floor against a thermometer somewhere else.
+
+Against it: **the floor was 0 at 2 a.m. and thousands by afternoon, on this
+same sensor.** A permanently damaged part does not read zero.
+
+The floor is real and it blocks every chemistry gate. Whether it is heat
+damage or simply ambient temperature is **open**, and settling it needs a
+thermometer on the sensor, or the same measurement repeated after dark.
 
 ---
 
